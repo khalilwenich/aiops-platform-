@@ -1,0 +1,77 @@
+stages:
+  - install
+  - build
+  - lint
+  - security
+
+variables:
+  NODE_VERSION: "20"
+
+# ─── Backend ───────────────────────────────────────────────
+
+backend:install:
+  stage: install
+  image: node:20-alpine
+  cache:
+    key: backend-$CI_COMMIT_REF_SLUG
+    paths:
+      - backend/node_modules/
+  script:
+    - cd backend
+    - npm ci
+  artifacts:
+    paths:
+      - backend/node_modules/
+    expire_in: 1 hour
+
+backend:syntax-check:
+  stage: build
+  image: node:20-alpine
+  needs: [backend:install]
+  script:
+    - cd backend
+    - node --check src/server.js
+    - node --check src/app.js
+    - node --check src/config/index.js
+  allow_failure: false
+
+# ─── Frontend ──────────────────────────────────────────────
+
+frontend:install:
+  stage: install
+  image: node:20-alpine
+  cache:
+    key: frontend-$CI_COMMIT_REF_SLUG
+    paths:
+      - frontend/node_modules/
+  script:
+    - cd frontend
+    - npm ci
+  artifacts:
+    paths:
+      - frontend/node_modules/
+    expire_in: 1 hour
+
+frontend:build:
+  stage: build
+  image: node:20-alpine
+  needs: [frontend:install]
+  script:
+    - cd frontend
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 day
+  allow_failure: false
+
+# ─── Security ──────────────────────────────────────────────
+
+dependency:audit:
+  stage: security
+  image: node:20-alpine
+  needs: [backend:install, frontend:install]
+  script:
+    - cd backend && npm audit --audit-level=critical || true
+    - cd ../frontend && npm audit --audit-level=critical || true
+  allow_failure: true
