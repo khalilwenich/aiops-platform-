@@ -1,0 +1,14 @@
+{
+  "name": "aiops-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names \"BACKEND,FRONTEND,REDIS,TUNNEL\" --prefix-colors \"cyan,magenta,yellow,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\" \"redis-server\" \"ngrok http 3001 --log stdout --log-format logfmt\"",
+    "backend": "npm run dev --prefix backend",
+    "frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
+    "concurrently": "^8.2.2"
+  }
+}

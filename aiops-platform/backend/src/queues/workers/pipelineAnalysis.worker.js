@@ -9,11 +9,15 @@ import { rootCauseAnalyzer } from '../../ai/rootCause.analyzer.js';
 import { Pipeline } from '../../models/Pipeline.model.js';
 import { Analysis } from '../../models/Analysis.model.js';
 import { Vulnerability } from '../../models/Vulnerability.model.js';
+import { Incident } from '../../models/Incident.model.js';
+import { mrCommentService } from '../../services/mrComment.service.js';
+import { knowledgeBaseService } from '../../services/knowledgeBase.service.js';
 import { logger } from '../../utils/logger.js';
 import { getIO } from '../../socket.js';
 
 async function processPipelineAnalysis(job) {
-  const { projectId, pipelineId, ref } = job.data;
+  const { projectId, projectName, pipelineId, ref, status } = job.data;
+  const sonarKey = projectName || String(projectId);
   logger.info('Processing pipeline analysis job', { jobId: job.id, projectId, pipelineId });
 
   // Step 1: Fetch pipeline data (graceful — proceed even if GitLab API is unavailable)
@@ -54,7 +58,7 @@ async function processPipelineAnalysis(job) {
       logger.error('Log collection failed', { error: err.message });
       return [];
     }),
-    sonarqubeService.fetchIssues(String(projectId)).catch(err => {
+    sonarqubeService.fetchIssues(sonarKey).catch(err => {
       logger.error('SonarQube fetch failed', { error: err.message });
       return { critical: [], major: [], total: 0 };
     }),
@@ -79,6 +83,26 @@ async function processPipelineAnalysis(job) {
   // Step 6: AI Analysis
   await job.updateProgress(75);
   const analysisResult = await rootCauseAnalyzer.analyze(normalizedData);
+
+  // Step 6b: Reuse a previously validated fix from the knowledge base, if this error recurred
+  const cachedSolution = await knowledgeBaseService
+    .findCachedSolution(analysisResult.errorType, analysisResult.rootCause || '')
+    .catch(() => null);
+  if (cachedSolution) {
+    analysisResult.suggestedFixes = [
+      {
+        priority: 'high',
+        description: `[Known fix, used ${cachedSolution.usedCount}x] ${cachedSolution.solution}`,
+        command: cachedSolution.command,
+        codeHint: cachedSolution.codeHint,
+      },
+      ...(analysisResult.suggestedFixes || []),
+    ];
+    logger.info('Knowledge base cache hit applied to analysis', {
+      signature: cachedSolution.errorSignature,
+      pipelineId,
+    });
+  }
 
   // Step 7: Save Analysis
   await job.updateProgress(85);
@@ -106,16 +130,61 @@ async function processPipelineAnalysis(job) {
     { upsert: true, new: true }
   );
 
-  // Step 8: Save vulnerabilities
-  if (vulnerabilities.length > 0) {
-    const vulnDocs = vulnerabilities.map(v => ({
-      ...v,
-      projectId: String(projectId),
-      pipelineId: String(pipelineId),
-    }));
-    await Vulnerability.insertMany(vulnDocs, { ordered: false }).catch(err => {
-      logger.warn('Some vulnerabilities failed to insert', { error: err.message });
+  // Step 7b: Auto-create an incident for failed pipelines
+  const resolvedStatus = status || pipelineData?.status;
+  if (resolvedStatus === 'failed') {
+    await Incident.findOneAndUpdate(
+      { pipelineId: String(pipelineId) },
+      {
+        $setOnInsert: {
+          incidentId: `INC-${pipelineId}`,
+          title: `${(analysisResult.errorType || 'unknown').replace(/_/g, ' ')} — pipeline #${pipelineId} failed`,
+          projectId: String(projectId),
+          projectName: pipelineData?.project?.name || projectName || String(projectId),
+          pipelineId: String(pipelineId),
+          severity: analysisResult.riskLevel || 'medium',
+          status: 'open',
+          detectedAt: new Date(),
+          analysis: analysis._id,
+          timeline: [{
+            timestamp: new Date(),
+            actor: 'AIOps Bot',
+            action: 'detected',
+            message: analysisResult.rootCause || analysisResult.summary || 'Pipeline failure detected',
+          }],
+        },
+      },
+      { upsert: true }
+    ).catch(err => {
+      logger.warn('Failed to create incident', { error: err.message, pipelineId });
     });
+    logger.info('Incident ensured for failed pipeline', { pipelineId });
+  }
+
+  // Step 7c: Post AI analysis as a comment on the related merge request, if any
+  if (resolvedStatus === 'failed') {
+    mrCommentService.findMRForBranch(projectId, ref).then(async (mr) => {
+      if (mr) {
+        await mrCommentService.postComment(projectId, mr.iid, analysisResult, { pipelineId });
+      }
+    }).catch(err => {
+      logger.warn('MR comment posting skipped', { error: err.message, pipelineId });
+    });
+  }
+
+  // Step 8: Save vulnerabilities (upsert to avoid duplicates)
+  if (vulnerabilities.length > 0) {
+    const ops = vulnerabilities.map(v => ({
+      updateOne: {
+        filter: { cveId: v.cveId, projectId: String(projectId), packageName: v.packageName },
+        update: { $set: { ...v, projectId: String(projectId), pipelineId: String(pipelineId) } },
+        upsert: true,
+      },
+    }));
+    await Vulnerability.bulkWrite(ops, { ordered: false }).catch(err => {
+      logger.warn('Some vulnerabilities failed to upsert', { error: err.message });
+    });
+    logger.info('Vulnerabilities saved', { count: vulnerabilities.length, pipelineId });
   }
 
   // Step 9: Emit socket event

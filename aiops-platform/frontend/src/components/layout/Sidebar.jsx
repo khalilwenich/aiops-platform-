@@ -1,21 +1,35 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap, BookOpen, Heart, FileText, AlertTriangle } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/slices/authSlice.js';
+import { incidentApi } from '../../api/incident.api.js';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/pipelines', icon: GitBranch, label: 'Pipelines' },
-  { path: '/analysis', icon: Brain, label: 'AI Analysis' },
-  { path: '/security', icon: ShieldAlert, label: 'Security' },
-  { path: '/settings', icon: Settings, label: 'Settings' },
+  { path: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/pipelines',  icon: GitBranch,        label: 'Pipelines' },
+  { path: '/analysis',   icon: Brain,            label: 'AI Analysis' },
+  { path: '/security',   icon: ShieldAlert,      label: 'Security' },
+  { path: '/knowledge',  icon: BookOpen,         label: 'Knowledge Base' },
+  { path: '/health',     icon: Heart,            label: 'Health Score' },
+  { path: '/reports',    icon: FileText,         label: 'Weekly Report' },
+  { path: '/incidents',  icon: AlertTriangle,    label: 'Incidents' },
+  { path: '/settings',   icon: Settings,         label: 'Settings' },
 ];
 
 export function Sidebar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector(state => state.auth.user);
+
+  const { data: openIncidents } = useQuery({
+    queryKey: ['incidents', 'open-count'],
+    queryFn: () => incidentApi.getAll({ status: 'open', limit: 1 }),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const openCount = openIncidents?.total || 0;
 
   const handleLogout = () => {
     dispatch(logout());
@@ -34,7 +48,9 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ path, icon: Icon, label }) => (
+        {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+          const badge = path === '/incidents' ? openCount : 0;
+          return (
           <NavLink
             key={path}
             to={path}
@@ -48,9 +64,15 @@ export function Sidebar() {
             }
           >
             <Icon className="w-4 h-4 flex-shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge > 0 && (
+              <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center ml-auto font-bold">
+                {badge}
+              </span>
+            )}
           </NavLink>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User section */}

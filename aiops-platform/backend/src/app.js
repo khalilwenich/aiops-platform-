@@ -7,6 +7,11 @@ import webhookRoutes from './api/routes/webhook.routes.js';
 import pipelineRoutes from './api/routes/pipeline.routes.js';
 import analysisRoutes from './api/routes/analysis.routes.js';
 import healthRoutes from './api/routes/health.routes.js';
+import vulnerabilityRoutes  from './api/routes/vulnerability.routes.js';
+import knowledgeRoutes      from './api/routes/knowledgeBase.routes.js';
+import healthScoreRoutes    from './api/routes/healthScore.routes.js';
+import incidentRoutes       from './api/routes/incident.routes.js';
+import weeklyReportRoutes   from './api/routes/weeklyReport.routes.js';
 import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
@@ -14,6 +19,7 @@ import { authLimiter } from './api/middlewares/rateLimiter.middleware.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
@@ -81,10 +87,17 @@ app.post('/api/auth/refresh', authenticate, async (req, res, next) => {
 
 // ─── API routes ─────────────────────────────────────────────────────────────
 
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/pipelines', pipelineRoutes);
 app.use('/api/analyses', analysisRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/vulnerabilities', vulnerabilityRoutes);
+app.use('/api/knowledge',      knowledgeRoutes);
+app.use('/api/health-score',   healthScoreRoutes);
+app.use('/api/incidents',      incidentRoutes);
+app.use('/api/reports',        weeklyReportRoutes);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 

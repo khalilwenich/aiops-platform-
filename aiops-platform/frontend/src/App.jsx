@@ -7,6 +7,11 @@ import { PipelinesPage } from './pages/PipelinesPage.jsx';
 import { AnalysisPage } from './pages/AnalysisPage.jsx';
 import { PipelineDetail } from './pages/PipelineDetail.jsx';
 import { SecurityPanel } from './pages/SecurityPanel.jsx';
+import Settings from './pages/Settings.jsx';
+import KnowledgeBase from './pages/KnowledgeBase.jsx';
+import HealthScore from './pages/HealthScore.jsx';
+import WeeklyReport from './pages/WeeklyReport.jsx';
+import Incidents from './pages/Incidents.jsx';
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useSelector(s => s.auth.isAuthenticated);
@@ -32,7 +37,11 @@ export function App() {
           <Route path="/pipelines/:id" element={<PipelineDetail />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/security" element={<SecurityPanel />} />
-          <Route path="/settings" element={<div className="text-text-muted">Settings coming soon</div>} />
+          <Route path="/settings"   element={<Settings />} />
+          <Route path="/knowledge"  element={<KnowledgeBase />} />
+          <Route path="/health"     element={<HealthScore />} />
+          <Route path="/reports"    element={<WeeklyReport />} />
+          <Route path="/incidents"  element={<Incidents />} />
         </Route>
       </Routes>
     </BrowserRouter>

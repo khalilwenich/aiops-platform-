@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { analysisApi } from '../api/analysis.api.js';
 
-export function useRecentAnalyses() {
+export function useRecentAnalyses(params = {}) {
   return useQuery({
-    queryKey: ['analyses', 'recent'],
-    queryFn: () => analysisApi.getRecent(),
+    queryKey: ['analyses', 'recent', params],
+    queryFn: async () => {
+      const res = await analysisApi.getRecent(params);
+      return res?.analyses ?? (Array.isArray(res) ? res : []);
+    },
     staleTime: 30_000,
   });
 }

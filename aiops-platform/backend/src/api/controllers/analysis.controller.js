@@ -1,5 +1,6 @@
 import { Analysis } from '../../models/Analysis.model.js';
 import { Pipeline } from '../../models/Pipeline.model.js';
+import { knowledgeBaseService } from '../../services/knowledgeBase.service.js';
 import { logger } from '../../utils/logger.js';
 
 export async function getAnalysisByPipeline(req, res, next) {
@@ -18,11 +19,24 @@ export async function getAnalysisByPipeline(req, res, next) {
 
 export async function getRecentAnalyses(req, res, next) {
   try {
-    const analyses = await Analysis.find()
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean();
-    res.json(analyses);
+    const { page = 1, limit = 20, status, riskLevel } = req.query;
+    const filter = {};
+    if (status === 'resolved') filter.resolved = true;
+    if (status === 'open') filter.resolved = { $ne: true };
+    if (riskLevel) filter.riskLevel = riskLevel;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [analyses, total] = await Promise.all([
+      Analysis.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      Analysis.countDocuments(filter),
+    ]);
+
+    res.json({
+      analyses,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     next(error);
   }
@@ -60,6 +74,10 @@ export async function markResolved(req, res, next) {
     analysis.resolvedAt = resolvedAt;
     if (mttr !== null) analysis.mttr = mttr;
     await analysis.save();
+
+    await knowledgeBaseService.saveFromAnalysis(analysis.toObject(), req.user.email).catch(err => {
+      logger.warn('Could not save resolution to knowledge base', { error: err.message });
+    });
 
     logger.info('Analysis marked resolved', {
       analysisId: analysis._id,

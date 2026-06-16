@@ -1,0 +1,51 @@
+backend:
+  image:
+    repository: khalil512/aiops-backend
+    tag: latest
+  replicas: 1
+  port: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontend:
+  image:
+    repository: khalil512/aiops-frontend
+    tag: latest
+  replicas: 1
+  port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+config:
+  nodeEnv: production
+  mongodbUri: mongodb://mongodb:27017/aiops
+  redisHost: redis-master
+  redisPort: "6379"
+  groqModel: llama-3.3-70b-versatile
+  sonarqubeUrl: ""
+  frontendUrl: ""
+
+ingress:
+  enabled: true
+  className: traefik
+  host: aiops.local
+
+# Secret values — override via a separate, untracked values.secrets.yaml
+# (helm install ... -f values.yaml -f values.secrets.yaml)
+secrets:
+  jwtSecret: ""
+  gitlabUrl: "https://gitlab.com"
+  gitlabToken: ""
+  gitlabWebhookSecret: ""
+  sonarqubeToken: ""
+  groqApiKey: ""

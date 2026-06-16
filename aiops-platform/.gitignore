@@ -57,3 +57,6 @@ temp/
 
 # ─── Redis dump ─────────────────────────────────────────────
 dump.rdb
+
+# ─── Helm secrets ───────────────────────────────────────────
+helm/aiops/values.secrets.yaml

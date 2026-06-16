@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aiops-config
+data:
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  PORT: {{ .Values.backend.port | quote }}
+  MONGODB_URI: {{ .Values.config.mongodbUri | quote }}
+  REDIS_HOST: {{ .Values.config.redisHost | quote }}
+  REDIS_PORT: {{ .Values.config.redisPort | quote }}
+  GROQ_MODEL: {{ .Values.config.groqModel | quote }}
+  SONARQUBE_URL: {{ .Values.config.sonarqubeUrl | quote }}
+  FRONTEND_URL: {{ .Values.config.frontendUrl | quote }}

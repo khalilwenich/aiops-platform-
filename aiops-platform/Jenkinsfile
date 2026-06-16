@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_TOKEN = credentials('dockerhub-token')
+        KUBECONFIG = '/var/jenkins_home/.kube/config'
+        SECRETS_FILE = '/home/vagrant/aiops-secrets/values.secrets.yaml'
+    }
+
+    stages {
+        stage('Install backend deps') {
+            steps {
+                sh 'cd aiops-platform/backend && npm ci'
+            }
+        }
+
+        stage('Test backend') {
+            steps {
+                sh 'cd aiops-platform/backend && npm test'
+            }
+        }
+
+        stage('Install frontend deps') {
+            steps {
+                sh 'cd aiops-platform/frontend && npm ci'
+            }
+        }
+
+        stage('Test frontend') {
+            steps {
+                sh 'cd aiops-platform/frontend && npm test'
+            }
+        }
+
+        stage('Build backend image') {
+            steps {
+                sh 'docker build -t khalil512/aiops-backend:latest aiops-platform/backend'
+            }
+        }
+
+        stage('Build frontend image') {
+            steps {
+                sh 'docker build -t khalil512/aiops-frontend:latest aiops-platform/frontend'
+            }
+        }
+
+        stage('Push images') {
+            steps {
+                sh '''
+                    echo "$DOCKERHUB_TOKEN" | docker login -u khalil512 --password-stdin
+                    docker push khalil512/aiops-backend:latest
+                    docker push khalil512/aiops-frontend:latest
+                '''
+            }
+        }
+
+        stage('Deploy to k3s') {
+            steps {
+                sh '''
+                    helm upgrade aiops aiops-platform/helm/aiops \
+                        -f aiops-platform/helm/aiops/values.yaml \
+                        -f "$SECRETS_FILE" \
+                        --wait --timeout 5m
+                    kubectl rollout restart deployment/aiops-backend deployment/aiops-frontend
+                    kubectl rollout status deployment/aiops-backend --timeout=120s
+                    kubectl rollout status deployment/aiops-frontend --timeout=120s
+                '''
+            }
+        }
+    }
+}
