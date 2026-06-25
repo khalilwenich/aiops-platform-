@@ -16,11 +16,14 @@ import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
 import { authLimiter } from './api/middlewares/rateLimiter.middleware.js';
+import { metricsMiddleware, metricsHandler } from './api/middlewares/metrics.middleware.js';
 
 const app = express();
 
 app.set('trust proxy', 1);
 app.use(helmet());
+app.use(metricsMiddleware);
+app.get('/metrics', metricsHandler);
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',

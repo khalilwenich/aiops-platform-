@@ -1,0 +1,78 @@
+# Values for the prometheus-community/kube-prometheus-stack release
+# deployed by the Jenkins "Deploy Monitoring" stage.
+# Sized down to fit the lab VM (4 vCPU / 8GB).
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30090
+  prometheusSpec:
+    # Pick up ServiceMonitors from any namespace/labels (e.g. aiops-backend's),
+    # not just ones matching the kube-prometheus-stack release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 5d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 400Mi
+      limits:
+        cpu: 500m
+        memory: 800Mi
+
+grafana:
+  adminPassword: admin
+  service:
+    type: NodePort
+    nodePort: 30300
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # This lab VM is slow to pull images / start containers — the chart's
+  # default probe timing kills Grafana before it finishes booting.
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 90
+    timeoutSeconds: 10
+    failureThreshold: 10
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 60
+    timeoutSeconds: 10
+    failureThreshold: 10
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# No paging configured for this lab project — disable to save resources.
+alertmanager:
+  enabled: false

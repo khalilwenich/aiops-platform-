@@ -44,6 +44,51 @@ pipeline {
             }
         }
 
+        stage('Trivy Scan') {
+            steps {
+                sh '''
+                    mkdir -p trivy-reports
+                    for IMAGE in khalil512/aiops-backend:latest khalil512/aiops-frontend:latest; do
+                        NAME=$(echo "$IMAGE" | cut -d/ -f2 | cut -d: -f1)
+
+                        # Full report (informational, never fails the build)
+                        docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            -v trivy-cache:/root/.cache/ \
+                            aquasec/trivy:latest image \
+                            --severity HIGH,CRITICAL \
+                            --format table \
+                            --exit-code 0 \
+                            "$IMAGE" | tee "trivy-reports/${NAME}.txt"
+
+                        docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            -v trivy-cache:/root/.cache/ \
+                            aquasec/trivy:latest image \
+                            --severity HIGH,CRITICAL \
+                            --format json \
+                            --exit-code 0 \
+                            --output "trivy-reports/${NAME}.json" \
+                            "$IMAGE"
+
+                        # Security gate: block the pipeline on CRITICAL CVEs
+                        docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            -v trivy-cache:/root/.cache/ \
+                            aquasec/trivy:latest image \
+                            --severity CRITICAL \
+                            --exit-code 1 \
+                            "$IMAGE"
+                    done
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'trivy-reports/*', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Push images') {
             steps {
                 sh '''
@@ -64,6 +109,22 @@ pipeline {
                     kubectl rollout restart deployment/aiops-backend deployment/aiops-frontend
                     kubectl rollout status deployment/aiops-backend --timeout=120s
                     kubectl rollout status deployment/aiops-frontend --timeout=120s
+                '''
+            }
+        }
+
+        stage('Deploy Monitoring (Prometheus & Grafana)') {
+            steps {
+                sh '''
+                    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+                    helm repo update
+
+                    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+                    helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+                        --namespace monitoring \
+                        -f aiops-platform/helm/monitoring/values.yaml \
+                        --wait --timeout 5m
                 '''
             }
         }
