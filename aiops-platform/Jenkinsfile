@@ -131,4 +131,12 @@ pipeline {
             }
         }
     }
+
+    post {
+        always {
+            // This lab VM's disk fills up fast (build layers, pulled images); clean up
+            // after every build so it doesn't hit disk-pressure on the next run.
+            sh 'docker system prune -af || true'
+        }
+    }
 }
