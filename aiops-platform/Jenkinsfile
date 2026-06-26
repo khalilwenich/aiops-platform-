@@ -68,8 +68,7 @@ pipeline {
                             --severity HIGH,CRITICAL \
                             --format json \
                             --exit-code 0 \
-                            --output "trivy-reports/${NAME}.json" \
-                            "$IMAGE"
+                            "$IMAGE" > "trivy-reports/${NAME}.json"
 
                         # Security gate: block the pipeline on CRITICAL CVEs
                         docker run --rm \
