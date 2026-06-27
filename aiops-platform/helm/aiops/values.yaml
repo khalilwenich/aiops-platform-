@@ -40,12 +40,6 @@ ingress:
   className: traefik
   host: aiops.local
 
-monitoring:
-  serviceMonitor:
-    enabled: true
-    interval: 15s
-    path: /metrics
-
 # Secret values — override via a separate, untracked values.secrets.yaml
 # (helm install ... -f values.yaml -f values.secrets.yaml)
 secrets:

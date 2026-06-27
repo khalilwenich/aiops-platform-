@@ -111,25 +111,6 @@ pipeline {
                 '''
             }
         }
-
-        stage('Deploy Monitoring (Prometheus & Grafana)') {
-            steps {
-                sh '''
-                    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
-                    helm repo update
-
-                    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-
-                    # No --wait: this lab VM is slow enough that Prometheus/Grafana
-                    # readiness can take longer than is reasonable to block the pipeline on.
-                    # Pods converge to Ready in the background after this stage returns.
-                    helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-                        --namespace monitoring \
-                        -f aiops-platform/helm/monitoring/values.yaml \
-                        --timeout 5m
-                '''
-            }
-        }
     }
 
     post {
