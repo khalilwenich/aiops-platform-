@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    triggers {
+        // Lightweight check against GitHub every ~3 minutes; only kicks off
+        // a real build when there's actually a new commit on main.
+        pollSCM('H/3 * * * *')
+    }
+
     environment {
         DOCKERHUB_TOKEN = credentials('dockerhub-token')
         KUBECONFIG = '/var/jenkins_home/.kube/config'
