@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema({
   },
   lastLoginAt: Date,
   isActive: { type: Boolean, default: true },
+  mustChangePassword: { type: Boolean, default: false },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

@@ -12,6 +12,7 @@ import knowledgeRoutes      from './api/routes/knowledgeBase.routes.js';
 import healthScoreRoutes    from './api/routes/healthScore.routes.js';
 import incidentRoutes       from './api/routes/incident.routes.js';
 import weeklyReportRoutes   from './api/routes/weeklyReport.routes.js';
+import usersRoutes          from './api/routes/users.routes.js';
 import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
@@ -68,6 +69,7 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        mustChangePassword: user.mustChangePassword,
       },
     });
   } catch (error) {
@@ -101,6 +103,7 @@ app.use('/api/knowledge',      knowledgeRoutes);
 app.use('/api/health-score',   healthScoreRoutes);
 app.use('/api/incidents',      incidentRoutes);
 app.use('/api/reports',        weeklyReportRoutes);
+app.use('/api/users',          usersRoutes);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 

@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, Bell, Link2, Brain, Shield, Building2, CheckCircle, XCircle, Info } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { User, Bell, Link2, Brain, Shield, Building2, CheckCircle, XCircle, Info, Users } from 'lucide-react';
 import ProfileSettings from '../components/settings/ProfileSettings.jsx';
 import NotificationSettings from '../components/settings/NotificationSettings.jsx';
 import IntegrationsSettings from '../components/settings/IntegrationsSettings.jsx';
 import AISettings from '../components/settings/AISettings.jsx';
 import SecuritySettings from '../components/settings/SecuritySettings.jsx';
 import PlatformSettings from '../components/settings/PlatformSettings.jsx';
+import UserManagement from '../components/settings/UserManagement.jsx';
 
 const TABS = [
   { id: 'profile',       label: 'Profile',          icon: User },
@@ -13,6 +15,7 @@ const TABS = [
   { id: 'integrations',  label: 'Integrations',     icon: Link2 },
   { id: 'ai',            label: 'AI Configuration', icon: Brain },
   { id: 'security',      label: 'Security',         icon: Shield },
+  { id: 'users',         label: 'Users',            icon: Users, adminOnly: true },
   { id: 'platform',      label: 'Platform',         icon: Building2 },
 ];
 
@@ -59,6 +62,8 @@ export function useToast() {
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const { toasts, addToast, removeToast } = useToast();
+  const role = useSelector((s) => s.auth.user?.role);
+  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || role === 'admin');
 
   const COMPONENTS = {
     profile:       <ProfileSettings       onToast={addToast} />,
@@ -66,6 +71,7 @@ export default function Settings() {
     integrations:  <IntegrationsSettings  onToast={addToast} />,
     ai:            <AISettings            onToast={addToast} />,
     security:      <SecuritySettings      onToast={addToast} />,
+    users:         <UserManagement        onToast={addToast} />,
     platform:      <PlatformSettings      onToast={addToast} />,
   };
 
@@ -84,7 +90,7 @@ export default function Settings() {
       <aside className="w-56 flex-shrink-0 bg-[#111318] border-r border-[#1E2130] flex flex-col pt-6">
         <p className="px-4 mb-4 text-xs font-semibold text-slate-600 uppercase tracking-widest">Settings</p>
         <nav className="flex flex-col gap-0.5 px-2">
-          {TABS.map(tab => {
+          {visibleTabs.map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
