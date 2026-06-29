@@ -92,6 +92,34 @@ export async function markResolved(req, res, next) {
   }
 }
 
+export async function getUsageStats(req, res, next) {
+  try {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [result] = await Analysis.aggregate([
+      { $match: { createdAt: { $gte: startOfMonth } } },
+      {
+        $group: {
+          _id: null,
+          totalAnalyses: { $sum: 1 },
+          avgConfidence: { $avg: '$confidence' },
+          avgProcessingTime: { $avg: '$processingTime' },
+        },
+      },
+    ]);
+
+    res.json({
+      totalAnalyses: result?.totalAnalyses || 0,
+      avgConfidence: result?.avgConfidence ? Math.round(result.avgConfidence * 100) : 0,
+      avgProcessingTimeSec: result?.avgProcessingTime ? Math.round(result.avgProcessingTime / 1000 * 10) / 10 : 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getTopRecurringIssues(req, res, next) {
   try {
     const topIssues = await Analysis.aggregate([

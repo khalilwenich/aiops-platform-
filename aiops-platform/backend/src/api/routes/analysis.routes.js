@@ -5,12 +5,14 @@ import {
   getRecentAnalyses,
   markResolved,
   getTopRecurringIssues,
+  getUsageStats,
 } from '../controllers/analysis.controller.js';
 
 const router = Router();
 
 router.get('/', authenticate, getRecentAnalyses);
 router.get('/recurring', authenticate, getTopRecurringIssues);
+router.get('/stats/usage', authenticate, getUsageStats);
 router.get('/:pipelineId', authenticate, getAnalysisByPipeline);
 router.patch('/:id/resolve', authenticate, authorize('admin', 'analyst'), markResolved);
 

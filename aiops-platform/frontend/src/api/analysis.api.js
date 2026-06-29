@@ -5,4 +5,5 @@ export const analysisApi = {
   getByPipeline: (pipelineId) => apiClient.get(`/api/analyses/${pipelineId}`),
   getRecurring: () => apiClient.get('/api/analyses/recurring'),
   markResolved: (id) => apiClient.patch(`/api/analyses/${id}/resolve`),
+  getUsageStats: () => apiClient.get('/api/analyses/stats/usage'),
 };

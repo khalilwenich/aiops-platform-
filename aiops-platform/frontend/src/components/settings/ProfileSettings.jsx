@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { Save, Upload, Eye, EyeOff, Lock } from 'lucide-react';
+import { usersApi } from '../../api/users.api.js';
+import { updateUser } from '../../store/slices/authSlice.js';
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -82,21 +85,74 @@ function getStrength(pwd) {
 }
 
 export default function ProfileSettings({ onToast }) {
-  const [profile, setProfile] = useState({ name: 'Administrator', title: 'DevOps Engineer', department: 'Engineering', phone: '' });
+  const dispatch = useDispatch();
+  const [profile, setProfile] = useState(null);
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [prefs, setPrefs] = useState({ language: 'Français', timezone: 'Africa/Tunis', dateFormat: 'DD/MM/YYYY', theme: 'Dark' });
   const [loading, setLoading] = useState({ profile: false, password: false, prefs: false });
 
-  const save = (key) => {
-    setLoading(l => ({ ...l, [key]: true }));
-    setTimeout(() => {
-      setLoading(l => ({ ...l, [key]: false }));
+  useEffect(() => {
+    usersApi.getProfile()
+      .then(({ user }) => {
+        setProfile({ name: user.name || '', title: user.title || '', department: user.department || '', phone: user.phone || '', email: user.email });
+        if (user.preferences) setPrefs(user.preferences);
+      })
+      .catch(() => onToast('Failed to load profile', 'error'));
+  }, [onToast]);
+
+  if (!profile) {
+    return <div className="text-slate-500 text-sm">Loading profile…</div>;
+  }
+
+  const saveProfile = async () => {
+    setLoading(l => ({ ...l, profile: true }));
+    try {
+      const { user } = await usersApi.updateProfile({ name: profile.name, title: profile.title, department: profile.department, phone: profile.phone });
+      dispatch(updateUser({ name: user.name }));
       onToast('Changes saved successfully', 'success');
-    }, 1500);
+    } catch (err) {
+      onToast(err?.error || 'Failed to save changes', 'error');
+    } finally {
+      setLoading(l => ({ ...l, profile: false }));
+    }
+  };
+
+  const savePassword = async () => {
+    if (!passwords.current || !passwords.next) {
+      onToast('Fill in both password fields', 'error');
+      return;
+    }
+    if (passwords.next !== passwords.confirm) {
+      onToast('Passwords do not match', 'error');
+      return;
+    }
+    setLoading(l => ({ ...l, password: true }));
+    try {
+      await usersApi.changeOwnPassword({ currentPassword: passwords.current, newPassword: passwords.next });
+      setPasswords({ current: '', next: '', confirm: '' });
+      onToast('Password updated', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to update password', 'error');
+    } finally {
+      setLoading(l => ({ ...l, password: false }));
+    }
+  };
+
+  const savePrefs = async () => {
+    setLoading(l => ({ ...l, prefs: true }));
+    try {
+      await usersApi.updateProfile({ preferences: prefs });
+      onToast('Preferences saved', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to save preferences', 'error');
+    } finally {
+      setLoading(l => ({ ...l, prefs: false }));
+    }
   };
 
   const strength = getStrength(passwords.next);
   const mismatch = passwords.confirm && passwords.next !== passwords.confirm;
+  const initials = (profile.name || profile.email || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <div>
@@ -105,11 +161,11 @@ export default function ProfileSettings({ onToast }) {
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600
             flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
-            AD
+            {initials}
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-100">Administrator</p>
-            <span className="bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded text-xs font-medium">Admin</span>
+            <p className="text-lg font-semibold text-slate-100">{profile.name || profile.email}</p>
+            <span className="bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded text-xs font-medium">{profile.title || 'Member'}</span>
             <div className="mt-3">
               <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200
                 border border-[#2A2F45] hover:border-[#3A3F55] rounded-lg px-3 py-1.5 transition-all">
@@ -127,7 +183,7 @@ export default function ProfileSettings({ onToast }) {
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Email</label>
             <div className="relative">
-              <input readOnly value="admin@aiops.local"
+              <input readOnly value={profile.email}
                 className="w-full bg-[#1A1D26]/50 border border-[#2A2F45] rounded-lg px-4 py-2.5 pr-10
                   text-slate-500 text-sm cursor-not-allowed" />
               <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
@@ -140,7 +196,7 @@ export default function ProfileSettings({ onToast }) {
           <InputField label="Phone (optional)" placeholder="+216 XX XXX XXX" value={profile.phone}
             onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
         </div>
-        <SaveButton onClick={() => save('profile')} loading={loading.profile}>Save Changes</SaveButton>
+        <SaveButton onClick={saveProfile} loading={loading.profile}>Save Changes</SaveButton>
       </SectionCard>
 
       {/* Change password */}
@@ -168,7 +224,7 @@ export default function ProfileSettings({ onToast }) {
             {mismatch && <p className="text-xs text-red-400 mt-1">Passwords do not match</p>}
           </div>
         </div>
-        <SaveButton onClick={() => save('password')} loading={loading.password}>Update Password</SaveButton>
+        <SaveButton onClick={savePassword} loading={loading.password}>Update Password</SaveButton>
       </SectionCard>
 
       {/* Preferences */}
@@ -194,7 +250,7 @@ export default function ProfileSettings({ onToast }) {
             </div>
           ))}
         </div>
-        <SaveButton onClick={() => save('prefs')} loading={loading.prefs}>Save Preferences</SaveButton>
+        <SaveButton onClick={savePrefs} loading={loading.prefs}>Save Preferences</SaveButton>
       </SectionCard>
     </div>
   );

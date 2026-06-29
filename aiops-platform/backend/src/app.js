@@ -13,6 +13,7 @@ import healthScoreRoutes    from './api/routes/healthScore.routes.js';
 import incidentRoutes       from './api/routes/incident.routes.js';
 import weeklyReportRoutes   from './api/routes/weeklyReport.routes.js';
 import usersRoutes          from './api/routes/users.routes.js';
+import settingsRoutes       from './api/routes/settings.routes.js';
 import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
@@ -104,6 +105,7 @@ app.use('/api/health-score',   healthScoreRoutes);
 app.use('/api/incidents',      incidentRoutes);
 app.use('/api/reports',        weeklyReportRoutes);
 app.use('/api/users',          usersRoutes);
+app.use('/api/settings',       settingsRoutes);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 

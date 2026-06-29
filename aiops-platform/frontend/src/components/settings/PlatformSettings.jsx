@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, Download, Trash2, Plus, Save, X, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, Download, Trash2, Save, AlertTriangle, Users } from 'lucide-react';
+import { settingsApi } from '../../api/settings.api.js';
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -24,189 +25,144 @@ function Toggle({ checked, onChange, danger }) {
   );
 }
 
-const SERVICES = [
-  { name: 'MongoDB',    status: 'Connected',   latency: '12ms',    jobs: null  },
-  { name: 'Redis',      status: 'Connected',   latency: '3ms',     jobs: null  },
-  { name: 'Groq API',   status: 'Operational', latency: '890ms',   jobs: null  },
-  { name: 'GitLab',     status: 'Connected',   latency: '45ms',    jobs: null  },
-  { name: 'SonarQube',  status: 'Connected',   latency: '67ms',    jobs: null  },
-  { name: 'BullMQ',     status: 'Running',     latency: null,      jobs: '0 jobs' },
-];
-
-const MOCK_USERS = [
-  { id: 1, name: 'Administrator', email: 'admin@aiops.local',   role: 'admin',   status: 'active',   last: 'Now' },
-  { id: 2, name: 'Nour G.',       email: 'nour@aiops.local',    role: 'analyst', status: 'active',   last: '2h ago' },
-  { id: 3, name: 'DevOps Bot',    email: 'bot@aiops.local',     role: 'viewer',  status: 'active',   last: '1d ago' },
-  { id: 4, name: 'Staging User',  email: 'staging@aiops.local', role: 'viewer',  status: 'inactive', last: '14d ago' },
-];
-
-function InviteModal({ onClose, onInvite }) {
-  const [email, setEmail] = useState('');
-  const [role, setRole]   = useState('viewer');
-
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-[#111318] border border-[#2A2F45] rounded-2xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-slate-100 font-semibold text-lg">Invite User</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="space-y-4 mb-5">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Email address</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="colleague@company.com"
-              className="w-full bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2.5
-                text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)}
-              className="w-full bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2.5
-                text-slate-100 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
-              <option value="admin">Admin</option>
-              <option value="analyst">Analyst</option>
-              <option value="viewer">Viewer</option>
-            </select>
-          </div>
-        </div>
-        <button onClick={() => { onInvite(email, role); onClose(); }} disabled={!email}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-all">
-          Send Invitation
-        </button>
-      </div>
-    </div>
-  );
+function formatUptime(seconds) {
+  if (!seconds) return '—';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 export default function PlatformSettings({ onToast }) {
-  const [users, setUsers]         = useState(MOCK_USERS);
-  const [showInvite, setShowInvite] = useState(false);
-  const [services, setServices]   = useState(SERVICES);
+  const [services, setServices] = useState([]);
+  const [platformInfo, setPlatformInfo] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [retention, setRetention] = useState({ pipelines: 90, analyses: 90, vulns: 180 });
   const [maintenance, setMaintenance] = useState(false);
   const [loadingAction, setLoadingAction] = useState(null);
   const [savingRetention, setSavingRetention] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  const loadStatus = useCallback(() => {
+    setRefreshing(true);
+    return settingsApi.getPlatformStatus()
+      .then(({ services, platformInfo }) => { setServices(services); setPlatformInfo(platformInfo); })
+      .catch(() => onToast('Failed to load system status', 'error'))
+      .finally(() => setRefreshing(false));
+  }, [onToast]);
+
+  useEffect(() => {
+    Promise.all([
+      settingsApi.getAll().then(({ settings }) => {
+        setRetention(settings.platform.retention);
+        setMaintenance(settings.platform.maintenance);
+      }),
+      loadStatus(),
+    ])
+      .catch(() => onToast('Failed to load platform settings', 'error'))
+      .finally(() => setReady(true));
+  }, [loadStatus, onToast]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCountdown(c => {
-        if (c <= 1) { return 30; }
+        if (c <= 1) { loadStatus(); return 30; }
         return c - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadStatus]);
 
-  const refresh = () => {
-    setRefreshing(true);
-    setCountdown(30);
-    setTimeout(() => { setRefreshing(false); onToast('System status refreshed', 'info'); }, 1200);
+  const refresh = () => { setCountdown(30); loadStatus().then(() => onToast('System status refreshed', 'info')); };
+
+  const saveRetention = async () => {
+    setSavingRetention(true);
+    try {
+      await settingsApi.updateSection('platform', { retention });
+      onToast('Retention policy saved', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to save retention policy', 'error');
+    } finally {
+      setSavingRetention(false);
+    }
   };
 
-  const doAction = (key, msg) => {
-    setLoadingAction(key);
-    setTimeout(() => { setLoadingAction(null); onToast(msg, 'success'); }, 1500);
+  const toggleMaintenance = async (v) => {
+    setMaintenance(v);
+    try {
+      await settingsApi.updateSection('platform', { maintenance: v });
+      onToast(v ? 'Maintenance mode enabled' : 'Maintenance mode disabled', v ? 'info' : 'success');
+    } catch (err) {
+      setMaintenance(!v);
+      onToast(err?.error || 'Failed to update maintenance mode', 'error');
+    }
   };
 
-  const latencyColor = (lat) => {
-    if (!lat) return 'text-slate-400';
-    const ms = parseInt(lat);
+  const clearCache = async () => {
+    if (!window.confirm('Clear the entire Redis cache?')) return;
+    setLoadingAction('cache');
+    try {
+      const { message } = await settingsApi.clearCache();
+      onToast(message, 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to clear cache', 'error');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const purgeAnalyses = async () => {
+    if (!window.confirm(`Permanently delete analyses older than ${retention.analyses} days?`)) return;
+    setLoadingAction('purge');
+    try {
+      const { message } = await settingsApi.purgeOldAnalyses();
+      onToast(message, 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to purge analyses', 'error');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const exportJson = async () => {
+    try {
+      const data = await settingsApi.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'aiops-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      onToast('Export downloaded', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Export failed', 'error');
+    }
+  };
+
+  const latencyColor = (ms) => {
+    if (ms == null) return 'text-slate-400';
     if (ms < 50)  return 'text-emerald-400';
     if (ms < 200) return 'text-amber-400';
     return 'text-red-400';
   };
 
-  const dotColor = (s) => {
-    if (['Connected','Operational','Running'].includes(s)) return 'bg-emerald-500';
-    return 'bg-red-500';
-  };
+  const dotColor = (s) => ['Connected', 'Operational', 'Running'].includes(s) ? 'bg-emerald-500' : 'bg-red-500';
+
+  if (!ready) {
+    return <div className="text-slate-500 text-sm">Loading platform settings…</div>;
+  }
 
   return (
     <div>
-      {showInvite && (
-        <InviteModal
-          onClose={() => setShowInvite(false)}
-          onInvite={(email, role) => {
-            setUsers(u => [...u, { id: Date.now(), name: email.split('@')[0], email, role, status: 'active', last: 'Never' }]);
-            onToast(`Invitation sent to ${email}`, 'success');
-          }}
-        />
-      )}
-
-      {/* User Management */}
+      {/* User Management pointer */}
       <SectionCard title="User Management" subtitle="Manage platform users and their permissions">
-        <div className="flex justify-end mb-4">
-          <button onClick={() => setShowInvite(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-3 py-2 rounded-lg transition-all">
-            <Plus className="w-4 h-4" /> Invite User
-          </button>
-        </div>
-        <div className="overflow-hidden rounded-lg border border-[#1E2130]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#1E2130]">
-                {['User', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-slate-500 text-xs font-medium uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b border-[#1E2130] last:border-0 hover:bg-[#1A1D26]/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600
-                        flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {u.name[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-slate-200 font-medium text-xs">{u.name}</p>
-                        <p className="text-slate-500 text-xs">{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={u.role}
-                      onChange={e => setUsers(us => us.map(x => x.id === u.id ? { ...x, role: e.target.value } : x))}
-                      className="bg-[#1A1D26] border border-[#2A2F45] rounded px-2 py-1 text-slate-300 text-xs
-                        focus:outline-none focus:border-indigo-500">
-                      <option value="admin">Admin</option>
-                      <option value="analyst">Analyst</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                      u.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/30 text-slate-500'}`}>
-                      {u.status === 'active' ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{u.last}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => onToast('User updated', 'success')}
-                        className="text-slate-500 hover:text-slate-300 text-xs border border-[#2A2F45] hover:border-[#3A3F55] px-2 py-1 rounded transition-all">
-                        Edit
-                      </button>
-                      <button onClick={() => setUsers(us => us.map(x => x.id === u.id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x))}
-                        className="text-red-500/60 hover:text-red-400 text-xs border border-red-500/20 hover:border-red-500/40 px-2 py-1 rounded transition-all">
-                        {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-3 text-slate-400 text-sm">
+          <Users className="w-4 h-4 text-indigo-400" />
+          <p>User accounts are managed from the <span className="text-indigo-400 font-medium">Users</span> tab.</p>
         </div>
       </SectionCard>
 
@@ -230,9 +186,9 @@ export default function PlatformSettings({ onToast }) {
                 <span className="text-slate-500 text-xs">{s.status}</span>
               </div>
               <div className="flex items-center gap-3">
-                {s.latency && <span className={`text-sm font-mono font-medium ${latencyColor(s.latency)}`}>{s.latency}</span>}
-                {s.jobs !== null && <span className="text-slate-400 text-sm">{s.jobs}</span>}
-                <span className="text-emerald-400 text-sm">✅</span>
+                {s.latencyMs != null && <span className={`text-sm font-mono font-medium ${latencyColor(s.latencyMs)}`}>{s.latencyMs}ms</span>}
+                {s.activeJobs != null && <span className="text-slate-400 text-sm">{s.activeJobs} jobs</span>}
+                {dotColor(s.status) === 'bg-emerald-500' ? <span className="text-emerald-400 text-sm">✅</span> : <span className="text-red-400 text-sm">⚠️</span>}
               </div>
             </div>
           ))}
@@ -266,8 +222,7 @@ export default function PlatformSettings({ onToast }) {
           <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-amber-300 text-sm">Data beyond the retention period will be permanently deleted.</p>
         </div>
-        <button onClick={() => { setSavingRetention(true); setTimeout(() => { setSavingRetention(false); onToast('Retention policy saved', 'success'); }, 1500); }}
-          disabled={savingRetention}
+        <button onClick={saveRetention} disabled={savingRetention}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-all">
           {savingRetention ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
           Save Retention Policy
@@ -279,52 +234,54 @@ export default function PlatformSettings({ onToast }) {
         {maintenance && (
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <p className="text-amber-300 text-sm font-medium">Webhook processing is PAUSED — maintenance mode active</p>
+            <p className="text-amber-300 text-sm font-medium">Maintenance mode is active</p>
           </div>
         )}
         <div className="space-y-0">
-          {[
-            {
-              key: 'cache', label: 'Clear Redis Cache',
-              desc: 'Flush all cached data from Redis. Jobs will continue processing.',
-              btn: 'Clear Cache', msg: 'Redis cache cleared',
-            },
-            {
-              key: 'purge', label: 'Purge Old Analyses',
-              desc: 'Remove analyses older than the retention period from the database.',
-              btn: 'Purge Now', msg: 'Old analyses purged',
-            },
-          ].map(({ key, label, desc, btn, msg }) => (
-            <div key={key} className="flex items-center justify-between py-4 border-b border-[#1E2130]">
-              <div>
-                <p className="text-slate-200 font-medium text-sm">{label}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{desc}</p>
-              </div>
-              <button onClick={() => doAction(key, msg)} disabled={loadingAction === key}
-                className="flex items-center gap-1.5 text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10
-                  disabled:opacity-60 px-3 py-1.5 rounded-lg transition-all">
-                {loadingAction === key
-                  ? <span className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                  : <Trash2 className="w-3.5 h-3.5" />}
-                {btn}
-              </button>
+          <div className="flex items-center justify-between py-4 border-b border-[#1E2130]">
+            <div>
+              <p className="text-slate-200 font-medium text-sm">Clear Redis Cache</p>
+              <p className="text-slate-500 text-xs mt-0.5">Flush all cached data from Redis. Jobs will continue processing.</p>
             </div>
-          ))}
+            <button onClick={clearCache} disabled={loadingAction === 'cache'}
+              className="flex items-center gap-1.5 text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10
+                disabled:opacity-60 px-3 py-1.5 rounded-lg transition-all">
+              {loadingAction === 'cache'
+                ? <span className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5" />}
+              Clear Cache
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-4 border-b border-[#1E2130]">
+            <div>
+              <p className="text-slate-200 font-medium text-sm">Purge Old Analyses</p>
+              <p className="text-slate-500 text-xs mt-0.5">Remove analyses older than the retention period from the database.</p>
+            </div>
+            <button onClick={purgeAnalyses} disabled={loadingAction === 'purge'}
+              className="flex items-center gap-1.5 text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10
+                disabled:opacity-60 px-3 py-1.5 rounded-lg transition-all">
+              {loadingAction === 'purge'
+                ? <span className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5" />}
+              Purge Now
+            </button>
+          </div>
 
           <div className="flex items-center justify-between py-4 border-b border-[#1E2130]">
             <div>
               <p className="text-slate-200 font-medium text-sm">Maintenance Mode</p>
-              <p className="text-slate-500 text-xs mt-0.5">Pause webhook processing for planned maintenance</p>
+              <p className="text-slate-500 text-xs mt-0.5">Flag the platform as under maintenance</p>
             </div>
-            <Toggle checked={maintenance} onChange={v => { setMaintenance(v); onToast(v ? 'Maintenance mode enabled' : 'Maintenance mode disabled', v ? 'info' : 'success'); }} danger />
+            <Toggle checked={maintenance} onChange={toggleMaintenance} danger />
           </div>
 
           <div className="flex items-center justify-between py-4">
             <div>
               <p className="text-slate-200 font-medium text-sm">Export Data</p>
-              <p className="text-slate-500 text-xs mt-0.5">Download all analyses and vulnerabilities as JSON</p>
+              <p className="text-slate-500 text-xs mt-0.5">Download the latest analyses and vulnerabilities as JSON</p>
             </div>
-            <button onClick={() => onToast('Export started — download will begin shortly', 'info')}
+            <button onClick={exportJson}
               className="flex items-center gap-1.5 text-sm text-slate-400 border border-[#2A2F45] hover:border-[#3A3F55]
                 hover:text-slate-200 px-3 py-1.5 rounded-lg transition-all">
               <Download className="w-3.5 h-3.5" /> Export JSON
@@ -339,12 +296,10 @@ export default function PlatformSettings({ onToast }) {
           {[
             { key: 'Platform',    val: 'AIOps Platform v1.0.0' },
             { key: 'Company',     val: 'Capgemini Altran Telnet Corporation Tunisie' },
-            { key: 'Environment', val: 'Development' },
-            { key: 'Node.js',     val: 'v20.x LTS' },
-            { key: 'Database',    val: 'MongoDB 7.x' },
-            { key: 'AI Model',    val: 'llama-3.3-70b-versatile (Groq)' },
-            { key: 'Uptime',      val: '2 days, 4 hours' },
-            { key: 'Last Deploy', val: 'April 17, 2026' },
+            { key: 'Environment', val: platformInfo?.nodeEnv || '—' },
+            { key: 'Node.js',     val: platformInfo?.nodeVersion || '—' },
+            { key: 'Database',    val: 'MongoDB' },
+            { key: 'Server Uptime', val: formatUptime(platformInfo?.uptimeSeconds) },
           ].map(({ key, val }) => (
             <div key={key} className="flex flex-col gap-0.5 py-2 border-b border-[#1E2130] last:border-0">
               <span className="text-slate-500 text-xs">{key}</span>

@@ -14,6 +14,15 @@ const userSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   mustChangePassword: { type: Boolean, default: false },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  title: { type: String, default: '' },
+  department: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  preferences: {
+    language: { type: String, default: 'Français' },
+    timezone: { type: String, default: 'Africa/Tunis' },
+    dateFormat: { type: String, default: 'DD/MM/YYYY' },
+    theme: { type: String, default: 'Dark' },
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

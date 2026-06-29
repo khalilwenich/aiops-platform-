@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, Info } from 'lucide-react';
+import { settingsApi } from '../../api/settings.api.js';
+import { analysisApi } from '../../api/analysis.api.js';
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -45,20 +47,54 @@ const ERROR_TYPES = [
   { key: 'perf',     label: 'Performance Issues',       desc: 'Timeouts, memory' },
 ];
 
+const DEFAULTS = {
+  behavior: { autoFailed: true, autoSuccess: false, reAnalyze: true, threshold: 60 },
+  errorTypes: { build: true, test: true, dep: true, security: true, config: true, perf: true },
+  fixes: { cli: true, code: true, autoResolve: false, maxFixes: 3 },
+};
+
 export default function AISettings({ onToast }) {
-  const [behavior, setBehavior] = useState({ autoFailed: true, autoSuccess: false, reAnalyze: true, threshold: 60 });
-  const [errorTypes, setErrorTypes] = useState({ build: true, test: true, dep: true, security: true, config: true, perf: true });
+  const [behavior, setBehavior] = useState(DEFAULTS.behavior);
+  const [errorTypes, setErrorTypes] = useState(DEFAULTS.errorTypes);
   const [contextEnabled, setContextEnabled] = useState(false);
   const [contextText, setContextText] = useState('');
-  const [fixes, setFixes] = useState({ cli: true, code: true, autoResolve: false, maxFixes: 3 });
+  const [fixes, setFixes] = useState(DEFAULTS.fixes);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [usage, setUsage] = useState(null);
 
-  const save = () => {
+  useEffect(() => {
+    Promise.all([settingsApi.getAll(), analysisApi.getUsageStats()])
+      .then(([{ settings }, stats]) => {
+        const ai = settings.ai;
+        setBehavior(ai.behavior);
+        setErrorTypes(ai.errorTypes);
+        setContextEnabled(ai.contextEnabled);
+        setContextText(ai.contextText);
+        setFixes(ai.fixes);
+        setUsage(stats);
+      })
+      .catch(() => onToast('Failed to load AI configuration', 'error'))
+      .finally(() => setReady(true));
+  }, [onToast]);
+
+  const save = async () => {
     setLoading(true);
-    setTimeout(() => { setLoading(false); onToast('AI configuration saved', 'success'); }, 1500);
+    try {
+      await settingsApi.updateSection('ai', { behavior, errorTypes, contextEnabled, contextText, fixes });
+      onToast('AI configuration saved', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to save AI configuration', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const charColor = contextText.length >= 480 ? 'text-red-400' : contextText.length >= 400 ? 'text-amber-400' : 'text-slate-500';
+
+  if (!ready) {
+    return <div className="text-slate-500 text-sm">Loading AI configuration…</div>;
+  }
 
   return (
     <div>
@@ -151,13 +187,12 @@ export default function AISettings({ onToast }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="AI Usage This Month" subtitle="Read-only statistics">
-        <div className="grid grid-cols-4 gap-3 mb-6">
+      <SectionCard title="AI Usage This Month" subtitle="Computed from this month's analyses">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { value: '127', label: 'Total analyses' },
-            { value: '84%', label: 'Avg confidence' },
-            { value: '8.3s', label: 'Avg analysis time' },
-            { value: '184k', label: 'Tokens used' },
+            { value: String(usage?.totalAnalyses ?? 0), label: 'Total analyses' },
+            { value: `${usage?.avgConfidence ?? 0}%`, label: 'Avg confidence' },
+            { value: `${usage?.avgProcessingTimeSec ?? 0}s`, label: 'Avg analysis time' },
           ].map(({ value, label }) => (
             <div key={label} className="bg-[#1A1D26] rounded-xl p-4 text-center">
               <p className="text-2xl font-bold text-indigo-400">{value}</p>

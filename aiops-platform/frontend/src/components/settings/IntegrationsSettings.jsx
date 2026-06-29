@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GitBranch, Shield, Search, Brain, Eye, EyeOff, Zap, Save, Info, Loader2 } from 'lucide-react';
+import { settingsApi } from '../../api/settings.api.js';
 
 function SectionCard({ title, subtitle, children, accentColor, icon, iconBg, connected }) {
   return (
@@ -90,35 +91,64 @@ function CardFooter({ onTest, onSave, loading, testResult }) {
   );
 }
 
+const isMasked = (v) => typeof v === 'string' && v.startsWith('••••');
+
 export default function IntegrationsSettings({ onToast }) {
-  const [gitlab, setGitlab]   = useState({ url: 'http://localhost:8929', token: '', secret: '', branch: 'main' });
-  const [sonar,  setSonar]    = useState({ url: 'http://localhost:9001', token: '', project: 'api-backend' });
+  const [gitlab, setGitlab]   = useState({ url: '', token: '', secret: '', branch: 'main' });
+  const [sonar,  setSonar]    = useState({ url: '', token: '', project: '' });
   const [trivy,  setTrivy]    = useState({ source: 'artifacts', filename: 'trivy-report.json', severity: 'HIGH' });
   const [groq,   setGroq]     = useState({ key: '', model: 'llama-3.3-70b-versatile', maxTokens: 1500, temperature: 0.3 });
   const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
+  const [ready, setReady] = useState(false);
 
-  const doTest = (key) => {
+  useEffect(() => {
+    settingsApi.getAll()
+      .then(({ settings }) => {
+        const { gitlab: g, sonarqube: s, trivy: t, groq: q } = settings.integrations;
+        setGitlab(g);
+        setSonar({ url: s.url, token: s.token, project: s.project });
+        setTrivy(t);
+        setGroq({ key: q.key, model: q.model, maxTokens: q.maxTokens, temperature: q.temperature });
+      })
+      .catch(() => onToast('Failed to load integration settings', 'error'))
+      .finally(() => setReady(true));
+  }, [onToast]);
+
+  const doTest = async (key, service, payload) => {
     setLoading(l => ({ ...l, [key]: 'test' }));
-    setTimeout(() => {
+    try {
+      const { success } = await settingsApi.testIntegration(service, payload);
+      setResults(r => ({ ...r, [key]: success ? 'success' : 'error' }));
+    } catch {
+      setResults(r => ({ ...r, [key]: 'error' }));
+    } finally {
       setLoading(l => ({ ...l, [key]: null }));
-      setResults(r => ({ ...r, [key]: 'success' }));
-    }, 1500);
+    }
   };
 
-  const doSave = (key, label) => {
+  const doSave = async (key, label, section, payload) => {
     setLoading(l => ({ ...l, [key]: 'save' }));
-    setTimeout(() => {
-      setLoading(l => ({ ...l, [key]: null }));
+    try {
+      await settingsApi.updateSection('integrations', { [section]: payload });
       onToast(`${label} settings saved`, 'success');
-    }, 1500);
+    } catch (err) {
+      onToast(err?.error || `Failed to save ${label} settings`, 'error');
+    } finally {
+      setLoading(l => ({ ...l, [key]: null }));
+    }
   };
+
+  if (!ready) {
+    return <div className="text-slate-500 text-sm">Loading integration settings…</div>;
+  }
 
   return (
     <div>
       {/* GitLab */}
       <SectionCard title="GitLab" accentColor="border-orange-500"
-        icon={<GitBranch className="w-5 h-5 text-orange-400" />} iconBg="bg-orange-500/10" connected={!!gitlab.url}>
+        icon={<GitBranch className="w-5 h-5 text-orange-400" />} iconBg="bg-orange-500/10"
+        connected={results.gitlab === 'success' || (!!gitlab.url && isMasked(gitlab.token))}>
         <div className="grid grid-cols-2 gap-4">
           <InputField label="GitLab Instance URL" value={gitlab.url} placeholder="https://gitlab.company.com"
             onChange={e => setGitlab(g => ({ ...g, url: e.target.value }))} />
@@ -129,13 +159,16 @@ export default function IntegrationsSettings({ onToast }) {
           <InputField label="Default Branch" value={gitlab.branch} placeholder="main"
             onChange={e => setGitlab(g => ({ ...g, branch: e.target.value }))} />
         </div>
-        <CardFooter onTest={() => doTest('gitlab')} onSave={() => doSave('gitlab', 'GitLab')}
+        <CardFooter
+          onTest={() => doTest('gitlab', 'gitlab', { url: gitlab.url, token: isMasked(gitlab.token) ? '' : gitlab.token })}
+          onSave={() => doSave('gitlab', 'GitLab', 'gitlab', gitlab)}
           loading={loading.gitlab} testResult={results.gitlab} />
       </SectionCard>
 
       {/* SonarQube */}
       <SectionCard title="SonarQube" accentColor="border-blue-500"
-        icon={<Shield className="w-5 h-5 text-blue-400" />} iconBg="bg-blue-500/10" connected={!!sonar.url}>
+        icon={<Shield className="w-5 h-5 text-blue-400" />} iconBg="bg-blue-500/10"
+        connected={results.sonar === 'success' || (!!sonar.url && isMasked(sonar.token))}>
         <div className="grid grid-cols-2 gap-4">
           <InputField label="SonarQube URL" value={sonar.url} placeholder="http://localhost:9001"
             onChange={e => setSonar(s => ({ ...s, url: e.target.value }))} />
@@ -144,7 +177,9 @@ export default function IntegrationsSettings({ onToast }) {
           <InputField label="Default Project Key" value={sonar.project} placeholder="my-project"
             onChange={e => setSonar(s => ({ ...s, project: e.target.value }))} />
         </div>
-        <CardFooter onTest={() => doTest('sonar')} onSave={() => doSave('sonar', 'SonarQube')}
+        <CardFooter
+          onTest={() => doTest('sonar', 'sonarqube', { url: sonar.url })}
+          onSave={() => doSave('sonar', 'SonarQube', 'sonarqube', sonar)}
           loading={loading.sonar} testResult={results.sonar} />
       </SectionCard>
 
@@ -184,7 +219,7 @@ export default function IntegrationsSettings({ onToast }) {
           </div>
         </div>
         <div className="flex justify-end mt-4 pt-4 border-t border-[#1E2130]">
-          <button onClick={() => doSave('trivy', 'Trivy')} disabled={loading.trivy === 'save'}
+          <button onClick={() => doSave('trivy', 'Trivy', 'trivy', trivy)} disabled={loading.trivy === 'save'}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60
               text-white text-sm font-medium px-4 py-2 rounded-lg transition-all">
             {loading.trivy === 'save' ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
@@ -195,7 +230,8 @@ export default function IntegrationsSettings({ onToast }) {
 
       {/* Groq AI */}
       <SectionCard title="Groq AI" accentColor="border-purple-500"
-        icon={<Brain className="w-5 h-5 text-purple-400" />} iconBg="bg-purple-500/10" connected={!!groq.key}>
+        icon={<Brain className="w-5 h-5 text-purple-400" />} iconBg="bg-purple-500/10"
+        connected={results.groq === 'success' || isMasked(groq.key)}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">API Key</label>
@@ -206,7 +242,7 @@ export default function IntegrationsSettings({ onToast }) {
                   className="w-full bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2.5
                     text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
-              <button onClick={() => doTest('groq')} disabled={loading.groq === 'test'}
+              <button onClick={() => doTest('groq', 'groq', { key: isMasked(groq.key) ? '' : groq.key })} disabled={loading.groq === 'test'}
                 className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200
                   border border-[#2A2F45] hover:border-[#3A3F55] rounded-lg px-3 py-2 transition-all">
                 {loading.groq === 'test' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
@@ -214,6 +250,7 @@ export default function IntegrationsSettings({ onToast }) {
               </button>
             </div>
             {results.groq === 'success' && <p className="text-emerald-400 text-xs mt-1">✅ API key valid</p>}
+            {results.groq === 'error' && <p className="text-red-400 text-xs mt-1">❌ Invalid key or unreachable</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-1.5">Model</label>
@@ -245,7 +282,7 @@ export default function IntegrationsSettings({ onToast }) {
           </div>
         </div>
         <div className="flex justify-end mt-4 pt-4 border-t border-[#1E2130]">
-          <button onClick={() => doSave('groqSave', 'AI')} disabled={loading.groqSave === 'save'}
+          <button onClick={() => doSave('groqSave', 'AI', 'groq', groq)} disabled={loading.groqSave === 'save'}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60
               text-white text-sm font-medium px-4 py-2 rounded-lg transition-all">
             {loading.groqSave === 'save' ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}

@@ -107,6 +107,63 @@ export async function resetPassword(req, res, next) {
   }
 }
 
+export async function getOwnProfile(req, res, next) {
+  try {
+    const user = await User.findById(req.user.id).lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        title: user.title,
+        department: user.department,
+        phone: user.phone,
+        preferences: user.preferences,
+        mustChangePassword: user.mustChangePassword,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateOwnProfile(req, res, next) {
+  try {
+    const { name, title, department, phone, preferences } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (typeof name === 'string' && name.trim()) user.name = name.trim();
+    if (typeof title === 'string') user.title = title;
+    if (typeof department === 'string') user.department = department;
+    if (typeof phone === 'string') user.phone = phone;
+    if (preferences && typeof preferences === 'object') {
+      user.preferences = { ...user.preferences, ...preferences };
+    }
+
+    await user.save();
+
+    res.json({
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        title: user.title,
+        department: user.department,
+        phone: user.phone,
+        preferences: user.preferences,
+        mustChangePassword: user.mustChangePassword,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function changeOwnPassword(req, res, next) {
   try {
     const { currentPassword, newPassword } = req.body;

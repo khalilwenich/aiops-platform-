@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, Lock, Loader2 } from 'lucide-react';
+import { settingsApi } from '../../api/settings.api.js';
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -73,25 +74,76 @@ function SaveButton({ onClick, loading, children, fullWidth }) {
   );
 }
 
+const DEFAULTS = {
+  pipeline: { failed: true, recovered: true, success: false, manual: true },
+  thresholds: { failureRate: 50, mttr: 60, confidence: 70 },
+  security: { critical: true, high: true, medium: false, qualityGate: true },
+  channels: { email: { enabled: false, address: '' }, slack: { enabled: false, webhookUrl: '' } },
+};
+
 export default function NotificationSettings({ onToast }) {
-  const [pipeline, setPipeline] = useState({ failed: true, recovered: true, success: false, manual: true });
-  const [thresholds, setThresholds] = useState({ failureRate: 50, mttr: 60, confidence: 70 });
-  const [security, setSecurity] = useState({ critical: true, high: true, medium: false, qualityGate: true });
+  const [pipeline, setPipeline] = useState(DEFAULTS.pipeline);
+  const [thresholds, setThresholds] = useState(DEFAULTS.thresholds);
+  const [security, setSecurity] = useState(DEFAULTS.security);
   const [channels, setChannels] = useState({ email: false, slack: false });
   const [emailAddr, setEmailAddr]   = useState('');
   const [slackUrl, setSlackUrl]     = useState('');
   const [slackTest, setSlackTest]   = useState(null);
   const [loading, setLoading]       = useState(false);
+  const [ready, setReady] = useState(false);
 
-  const testSlack = () => {
+  useEffect(() => {
+    settingsApi.getAll()
+      .then(({ settings }) => {
+        const n = settings.notifications;
+        setPipeline(n.pipeline);
+        setThresholds(n.thresholds);
+        setSecurity(n.security);
+        setChannels({ email: n.channels.email.enabled, slack: n.channels.slack.enabled });
+        setEmailAddr(n.channels.email.address);
+        setSlackUrl(n.channels.slack.webhookUrl);
+      })
+      .catch(() => onToast('Failed to load notification settings', 'error'))
+      .finally(() => setReady(true));
+  }, [onToast]);
+
+  const testSlack = async () => {
     setSlackTest('loading');
-    setTimeout(() => setSlackTest(slackUrl ? 'success' : 'error'), 1500);
+    try {
+      const { success } = await settingsApi.testSlack(slackUrl);
+      setSlackTest(success ? 'success' : 'error');
+    } catch {
+      setSlackTest('error');
+    }
   };
 
-  const save = () => {
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onToast('Notification settings saved', 'success'); }, 1500);
+  const testEmail = () => {
+    onToast('Email delivery is not configured on this server yet', 'error');
   };
+
+  const save = async () => {
+    setLoading(true);
+    try {
+      await settingsApi.updateSection('notifications', {
+        pipeline,
+        thresholds,
+        security,
+        channels: {
+          email: { enabled: channels.email, address: emailAddr },
+          slack: { enabled: channels.slack, webhookUrl: slackUrl },
+        },
+      });
+      onToast('Notification settings saved', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to save notification settings', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!ready) {
+    return <div className="text-slate-500 text-sm">Loading notification settings…</div>;
+  }
 
   return (
     <div>
@@ -166,7 +218,7 @@ export default function NotificationSettings({ onToast }) {
                 className="flex-1 bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2
                   text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
-              <button className="text-sm text-slate-400 hover:text-slate-200 border border-[#2A2F45]
+              <button onClick={testEmail} className="text-sm text-slate-400 hover:text-slate-200 border border-[#2A2F45]
                 hover:border-[#3A3F55] rounded-lg px-3 py-2 transition-all">
                 Send test email
               </button>
@@ -196,8 +248,9 @@ export default function NotificationSettings({ onToast }) {
                 />
                 <button
                   onClick={testSlack}
+                  disabled={slackTest === 'loading'}
                   className="text-sm text-slate-400 hover:text-slate-200 border border-[#2A2F45]
-                    hover:border-[#3A3F55] rounded-lg px-3 py-2 transition-all flex items-center gap-1.5"
+                    hover:border-[#3A3F55] rounded-lg px-3 py-2 transition-all flex items-center gap-1.5 disabled:opacity-60"
                 >
                   {slackTest === 'loading' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Test Connection

@@ -1,9 +1,14 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
-import { list, create, update, resetPassword, changeOwnPassword } from '../controllers/users.controller.js';
+import {
+  list, create, update, resetPassword, changeOwnPassword,
+  getOwnProfile, updateOwnProfile,
+} from '../controllers/users.controller.js';
 
 const router = Router();
 
+router.get('/me',                  authenticate, getOwnProfile);
+router.patch('/me',                authenticate, updateOwnProfile);
 router.post('/me/change-password', authenticate, changeOwnPassword);
 
 router.get('/',                    authenticate, authorize('admin'), list);
