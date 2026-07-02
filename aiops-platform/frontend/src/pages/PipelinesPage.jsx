@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { GitBranch, Filter, RefreshCw } from 'lucide-react';
+import { GitBranch, Filter, RefreshCw, Bell } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePipelines } from '../hooks/usePipelines.js';
 import { PipelineTable } from '../components/dashboard/PipelineTable.jsx';
@@ -15,7 +15,11 @@ export function PipelinesPage() {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const { currentPage, statusFilter } = useSelector(s => s.pipelines);
+  const currentUser = useSelector(s => s.auth.user);
   const [projectSearch, setProjectSearch] = useState('');
+  const [myProjectsOnly, setMyProjectsOnly] = useState(false);
+
+  const subscribedProjects = currentUser?.subscribedProjects || [];
 
   const params = {
     page: currentPage,
@@ -25,7 +29,10 @@ export function PipelinesPage() {
   };
 
   const { data, isLoading, isFetching } = usePipelines(params);
-  const pipelines = data?.pipelines || [];
+  const allPipelines = data?.pipelines || [];
+  const pipelines = myProjectsOnly && subscribedProjects.length > 0
+    ? allPipelines.filter(p => subscribedProjects.includes(p.projectId))
+    : allPipelines;
   const pagination = data?.pagination;
 
   return (
@@ -76,6 +83,22 @@ export function PipelinesPage() {
               </button>
             ))}
           </div>
+
+          {/* Mes projets toggle */}
+          {subscribedProjects.length > 0 && (
+            <button
+              onClick={() => setMyProjectsOnly(v => !v)}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                myProjectsOnly
+                  ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30'
+                  : 'bg-surface-2 text-text-muted border-border hover:border-border-2'
+              )}
+            >
+              <Bell className="w-3 h-3" />
+              Mes projets
+            </button>
+          )}
 
           {/* Project search */}
           <input

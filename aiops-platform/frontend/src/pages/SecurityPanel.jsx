@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, AlertTriangle, AlertCircle, Info, Skull } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { apiClient } from '../api/client.js';
@@ -30,6 +30,7 @@ function SeverityStat({ severity, count }) {
 }
 
 export function SecurityPanel() {
+  const queryClient = useQueryClient();
   const { data: vulns = [], isLoading } = useQuery({
     queryKey: ['vulnerabilities'],
     queryFn: () => apiClient.get('/api/vulnerabilities'),
@@ -37,6 +38,23 @@ export function SecurityPanel() {
   });
 
   const vulnList = Array.isArray(vulns) ? vulns : (vulns?.vulnerabilities || []);
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+
+  const ignoreMutation = useMutation({
+    mutationFn: (id) => apiClient.patch(`/api/vulnerabilities/${id}/ignore`),
+    onSuccess: invalidate,
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: ({ id, justification }) => apiClient.patch(`/api/vulnerabilities/${id}/accept`, { justification }),
+    onSuccess: invalidate,
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: (id) => apiClient.patch(`/api/vulnerabilities/${id}/reopen`),
+    onSuccess: invalidate,
+  });
 
   const counts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].reduce((acc, sev) => {
     acc[sev] = vulnList.filter(v => v.severity?.toUpperCase() === sev).length;
@@ -72,7 +90,12 @@ export function SecurityPanel() {
           <Shield className="w-4 h-4 text-indigo-400" />
           <h2 className="text-sm font-semibold text-text-primary">Vulnerabilities ({vulnList.length})</h2>
         </div>
-        <VulnerabilityTable vulnerabilities={vulnList} />
+        <VulnerabilityTable
+          vulnerabilities={vulnList}
+          onIgnore={(id) => ignoreMutation.mutate(id)}
+          onAccept={(id, justification) => acceptMutation.mutate({ id, justification })}
+          onReopen={(id) => reopenMutation.mutate(id)}
+        />
       </Card>
 
       {/* Top affected packages */}

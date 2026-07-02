@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   name: String,
   role: {
     type: String,
-    enum: ['admin', 'analyst', 'viewer'],
+    enum: ['admin', 'analyst', 'security', 'viewer'],
     default: 'viewer',
   },
   lastLoginAt: Date,
@@ -23,6 +23,8 @@ const userSchema = new mongoose.Schema({
     dateFormat: { type: String, default: 'DD/MM/YYYY' },
     theme: { type: String, default: 'Dark' },
   },
+  subscribedProjects: [{ type: String }],
+  slackWebhook: { type: String, default: '' },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

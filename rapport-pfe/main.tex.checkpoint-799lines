@@ -1,0 +1,799 @@
+%====================================================================
+%  RAPPORT DE PROJET DE FIN D'ÉTUDES (PFE)
+%  Plateforme AIOps — Analyse Intelligente des Pipelines CI/CD
+%  Auteur : Khalil Ben Yahia Wenich — ESPRIT, 2025/2026
+%
+%  Compilation : pdflatex main.tex (exécuter deux fois pour la table des matières et les références)
+%  Sur Overleaf : créer un projet vierge et téléverser ce fichier.
+%====================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+%---------------------- Encodage & langue -------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[english,french]{babel}   % main = french
+\usepackage{microtype}
+
+%---------------------- Mise en page --------------------------------------
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage[justification=centering]{caption}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{fancyhdr}
+
+%---------------------- Page de couverture ESPRIT (TikZ) -------------------------
+\usepackage{helvet}
+\usepackage{tikz}
+\usetikzlibrary{calc,arrows.meta,positioning,shapes.geometric,shapes.multipart,fit,backgrounds}
+\definecolor{espred}{HTML}{D2241F}
+\definecolor{banred}{HTML}{9E1B22}
+\definecolor{dgrey}{HTML}{3C3C3C}
+\definecolor{mgrey}{HTML}{8C8C8C}
+\definecolor{lgrey}{HTML}{C9C9C9}
+% triangle équilatéral : x, y, taille, angle, options-remplissage
+\newcommand{\tri}[5]{\fill[#5] (#1,#2) -- ($(#1,#2)+(#4:#3)$) -- ($(#1,#2)+({#4+120}:#3)$) -- cycle;}
+% emplacement logo : x1,y1,x2,y2,étiquette
+\newcommand{\logobox}[5]{%
+  \draw[dashed,lgrey,fill=white] (#1,#2) rectangle (#3,#4);
+  \node[mgrey,font=\sffamily\itshape\small,align=center] at ({(#1+#3)/2},{(#2+#4)/2}) {#5};}
+
+%---------------------- Palette de couleurs -------------------------
+\definecolor{primary}{HTML}{0F3D5C}
+\definecolor{accent}{HTML}{0D9488}
+\definecolor{primarylight}{HTML}{EAF2F6}
+\definecolor{codebg}{HTML}{F6F8FA}
+\definecolor{codekw}{HTML}{0D9488}
+\definecolor{codecmt}{HTML}{6A737D}
+\definecolor{codestr}{HTML}{B85C00}
+
+%---------------------- Hyperliens ----------------------------------
+\usepackage[hidelinks]{hyperref}
+\hypersetup{colorlinks=true,linkcolor=primary,citecolor=accent,urlcolor=accent,
+  pdftitle={Rapport PFE - Plateforme AIOps},pdfauthor={Khalil Ben Yahia Wenich}}
+
+%---------------------- Style des titres -------------------------------
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{primary}}
+  {\filright\Large\color{accent}\chaptertitlename\ \thechapter}
+  {0.6ex}{\titlerule[1.2pt]\vspace{1ex}\filright}
+\titlespacing*{\chapter}{0pt}{10pt}{30pt}
+\titleformat{\section}{\normalfont\Large\bfseries\color{primary}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{primary!85}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries\color{accent}}{\thesubsubsection}{1em}{}
+
+%---------------------- Pointillés de la table des matières -----------------------------
+\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftchapfont}{\bfseries\color{primary}}
+\renewcommand{\cftchappagefont}{\bfseries\color{primary}}
+
+%---------------------- En-têtes / pieds de page ---------------------------
+\pagestyle{fancy}\fancyhf{}\setlength{\headheight}{15pt}
+\renewcommand{\headrulewidth}{0.4pt}\renewcommand{\footrulewidth}{0pt}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyhead[R]{\small\textcolor{accent}{AIOps Platform}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\chaptermark}[1]{\markboth{\chaptername\ \thechapter.\ #1}{}}
+
+%---------------------- Styles de code ---------------------------------
+\lstdefinestyle{custom}{
+  backgroundcolor=\color{codebg},basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekw}\bfseries,commentstyle=\color{codecmt}\itshape,
+  stringstyle=\color{codestr},numbers=left,numberstyle=\tiny\color{codecmt},
+  numbersep=8pt,frame=single,rulecolor=\color{primary!30},breaklines=true,
+  showstringspaces=false,tabsize=2,captionpos=b,xleftmargin=14pt,framexleftmargin=14pt}
+\lstset{style=custom}
+\lstdefinelanguage{JavaScript}{
+  keywords={const,let,var,function,return,if,else,for,while,require,async,await,new,class,extends,import,export,default,try,catch,throw,typeof,enum},
+  keywordstyle=\color{codekw}\bfseries,
+  ndkeywords={true,false,null,undefined,this,String,Number,Boolean,Date,Schema},
+  ndkeywordstyle=\color{primary}\bfseries,
+  comment=[l]{//},morecomment=[s]{/*}{*/},commentstyle=\color{codecmt}\itshape,
+  morestring=[b]",morestring=[b]',morestring=[b]`,stringstyle=\color{codestr},sensitive=true}
+
+%---------------------- Auxiliaires -------------------------------------
+\newcommand{\figplaceholder}[3][0.8\textwidth]{%
+  \begin{figure}[H]\centering\setlength{\fboxsep}{0pt}%
+  \fcolorbox{primary!40}{primarylight}{\parbox[c][4.6cm][c]{#1}{%
+    \centering\itshape\small\textcolor{primary!70}{[\,Emplacement de figure --- insérer capture d'écran / diagramme\,]}\\[6pt]\textcolor{accent}{#2}}}%
+  \caption{#2}\label{#3}\end{figure}}
+\newtcolorbox{note}[1][]{colback=accent!6,colframe=accent!70,fonttitle=\bfseries,
+  coltitle=white,title={À compléter / adapter},boxrule=0.6pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt,#1}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+%---------------------- Styles des diagrammes TikZ --------------------------
+\tikzset{
+  block/.style={rectangle,rounded corners=2pt,draw=primary,thick,fill=primarylight,
+    align=center,minimum height=1.1cm,inner sep=6pt,font=\sffamily\small},
+  blockalt/.style={block,fill=accent!12,draw=accent},
+  blockdark/.style={block,fill=primary,draw=primary,text=white,font=\sffamily\small\bfseries},
+  actor/.style={font=\sffamily\small\bfseries,align=center},
+  usecase/.style={ellipse,draw=primary,thick,fill=primarylight,align=center,
+    font=\sffamily\footnotesize,minimum width=3.1cm,minimum height=1.05cm,inner sep=2pt},
+  flowarrow/.style={-{Latex[length=2.5mm,width=2mm]},thick,primary},
+  lifeline/.style={dashed,mgrey,thick},
+  actstep/.style={-{Latex[length=2mm,width=1.6mm]},accent,thick,font=\sffamily\tiny},
+  classbox/.style={rectangle split,rectangle split parts=2,draw=primary,thick,
+    rectangle split part align={center,left},align=left,font=\sffamily\scriptsize,
+    fill=white,text width=3.05cm,inner sep=4pt}
+}
+
+%====================================================================
+\begin{document}
+%====================================================================
+
+%--------------------------- PAGE DE COUVERTURE -----------------------------
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+\begin{scope}[shift={(current page.south west)}, x=1cm, y=1cm]
+
+% ---- Fond ----
+\fill[white] (0,0) rectangle (21,29.7);
+
+% ============ MOSAÏQUE DE TRIANGLES ============
+% Groupe haut-gauche (dense)
+\tri{-0.5}{29.7}{3.4}{-35}{espred}
+\tri{2.6}{29.9}{3.0}{205}{dgrey}
+\tri{0.4}{27.0}{2.4}{15}{mgrey,opacity=0.85}
+\tri{3.7}{28.4}{2.2}{-105}{espred,opacity=0.85}
+\tri{-0.3}{25.2}{2.6}{42}{lgrey}
+\tri{5.0}{29.6}{2.0}{165}{dgrey,opacity=0.7}
+\tri{2.3}{25.6}{1.7}{-55}{espred}
+\tri{5.6}{27.4}{1.6}{95}{mgrey,opacity=0.55}
+\tri{0.2}{23.8}{1.9}{-18}{dgrey,opacity=0.45}
+\tri{3.9}{25.9}{1.3}{150}{lgrey,opacity=0.8}
+\tri{6.6}{29.0}{1.4}{-70}{espred,opacity=0.6}
+% Bord gauche (épars)
+\tri{-0.4}{21.0}{1.9}{-25}{lgrey,opacity=0.7}
+\tri{-0.3}{18.0}{1.6}{30}{mgrey,opacity=0.5}
+\tri{0.0}{15.0}{1.7}{-15}{dgrey,opacity=0.35}
+\tri{-0.4}{12.0}{1.5}{40}{lgrey,opacity=0.6}
+\tri{-0.2}{9.2}{1.8}{-30}{espred,opacity=0.45}
+% Coin haut-droit
+\tri{21.4}{29.7}{3.0}{200}{dgrey,opacity=0.85}
+\tri{19.4}{29.9}{2.2}{-40}{espred,opacity=0.8}
+\tri{21.5}{27.2}{1.8}{150}{mgrey,opacity=0.55}
+\tri{18.6}{28.4}{1.4}{60}{lgrey,opacity=0.7}
+% Coin bas-gauche
+\tri{-0.5}{0.0}{3.0}{55}{dgrey}
+\tri{2.2}{-0.4}{2.6}{125}{espred,opacity=0.9}
+\tri{0.3}{2.6}{2.0}{-30}{mgrey,opacity=0.7}
+\tri{4.0}{0.2}{1.8}{100}{lgrey}
+\tri{1.4}{3.4}{1.3}{200}{espred,opacity=0.55}
+\tri{5.2}{1.0}{1.4}{150}{dgrey,opacity=0.5}
+% Coin bas-droit
+\tri{21.5}{0.0}{3.0}{120}{dgrey}
+\tri{18.8}{-0.4}{2.6}{55}{espred,opacity=0.9}
+\tri{20.8}{2.8}{2.0}{210}{mgrey,opacity=0.7}
+\tri{17.2}{0.2}{1.8}{80}{lgrey}
+\tri{19.8}{3.6}{1.3}{-20}{espred,opacity=0.55}
+\tri{16.4}{1.2}{1.4}{30}{dgrey,opacity=0.5}
+
+% ============ LOGO ESPRIT (emplacement) ============
+\logobox{7.3}{27.0}{13.7}{29.2}{Logo ESPRIT\\(\`a ins\'erer)}
+
+% ============ ANNÉE + PFE ============
+\node[anchor=west,espred,font=\sffamily\fontsize{24}{26}\bfseries] at (4.0,25.4) {2025 - 2026};
+\node[anchor=west,dgrey,font=\sffamily\fontsize{20}{22}\bfseries] at (4.0,24.4) {PROJET DE FIN D'\'ETUDES};
+
+% ============ BANDEAU ROUGE ============
+\fill[banred] (0,22.0) rectangle (21,23.5);
+\fill[banred!65!black] (0,22.0) -- (1.4,22.0) -- (0,23.5) -- cycle;
+\node[white,font=\sffamily\fontsize{19}{21}\bfseries] at (10.5,22.75) {DIPL\^OME NATIONAL D'ING\'ENIEUR};
+
+% ============ SPÉCIALITÉ ============
+\node[anchor=west,dgrey,font=\sffamily\fontsize{15}{17}\bfseries] at (3.5,20.9)
+   {SP\'ECIALIT\'E :\hspace{0.4cm}\textcolor{espred}{TWIN}};
+
+% ============ TITRE DU PROJET ============
+\node[align=center,dgrey,font=\sffamily\fontsize{19}{24}\bfseries] at (10.5,18.7)
+   {Plateforme AIOps\\[2pt] Analyse Intelligente des Pipelines CI/CD};
+
+% ============ INTERVENANTS ============
+\node[align=center,dgrey,font=\sffamily\fontsize{12}{15}\bfseries] at (10.5,15.6)
+   {R\'ealis\'e par : \mdseries Khalil Ben Yahia Wenich};
+\node[align=center,dgrey,font=\sffamily\fontsize{12}{15}\bfseries] at (10.5,14.0)
+   {Encadrant ESPRIT : \mdseries Mme Houda Jendoubi};
+\node[align=center,dgrey,font=\sffamily\fontsize{12}{15}\bfseries] at (10.5,12.4)
+   {Encadrant Entreprise : \mdseries Mr [Nom de l'encadrant]};
+
+% ============ LOGO ENTREPRISE (emplacement) ============
+\logobox{7.4}{8.2}{13.6}{10.6}{Logo Capgemini\\Altran Telnet Corporation}
+
+% ============ BANDEAU D'ACCRÉDITATIONS (emplacement) ============
+\logobox{2.0}{0.8}{19.0}{2.4}{Bandeau accr\'editations (UNESCO -- CDIO -- EUR-ACE -- Cti -- CGE)}
+
+\end{scope}
+\end{tikzpicture}
+\null
+\end{titlepage}
+
+%--------------------------- DÉDICACE -----------------------------
+\pagenumbering{roman}
+\chapter*{Dédicace}\addcontentsline{toc}{chapter}{Dédicace}\thispagestyle{plain}
+\begin{flushright}\itshape\vspace{2cm}
+À mes chers parents, pour leur soutien et leurs sacrifices constants,\\[6pt]
+À ma famille et mes amis, pour leurs encouragements permanents,\\[6pt]
+À tous ceux qui ont contribué, directement ou indirectement, à l'accomplissement de ce travail.\\[10pt]
+Je dédie ce modeste travail.
+\end{flushright}
+
+%--------------------------- REMERCIEMENTS ------------------------
+\chapter*{Remerciements}\addcontentsline{toc}{chapter}{Remerciements}\thispagestyle{plain}
+Au terme de ce projet de fin d'études, je tiens à exprimer ma profonde gratitude envers toutes les personnes qui ont contribué à sa réussite.
+
+Je remercie tout d'abord mon encadrante académique, \textbf{Mme Houda Jendoubi}, pour son encadrement, ses précieux conseils et sa disponibilité tout au long de ce travail.
+
+J'adresse également mes sincères remerciements à mon encadrant en entreprise chez \textbf{Capgemini --- Altran Telnet Corporation Tunisie}, ainsi qu'à toute l'équipe d'ingénierie, pour leur accueil, leur confiance et le partage de leur expertise sur les pratiques CI/CD et l'outillage DevOps de niveau production.
+
+Mes remerciements vont aussi au corps enseignant et au personnel administratif de \textbf{ESPRIT School of Engineering} pour la qualité de la formation dispensée durant mes études.
+
+Enfin, je remercie les membres du jury d'avoir accepté d'évaluer ce travail.
+
+%--------------------------- ABSTRACT / RÉSUMÉ ----------------------
+\chapter*{Résumé}\addcontentsline{toc}{chapter}{Résumé}\thispagestyle{plain}
+Ce projet de fin d'études, réalisé au sein de \textbf{Capgemini --- Altran Telnet Corporation Tunisie}, consiste à concevoir et développer une \textbf{plateforme AIOps} (Artificial Intelligence for IT Operations) pour l'analyse automatisée des pipelines CI/CD.
+
+La solution reçoit les événements GitLab en temps réel via des webhooks sécurisés, collecte les rapports de qualité (SonarQube) et de sécurité (Trivy), puis soumet le contexte agrégé à un grand modèle de langage (Large Language Model, Groq --- Llama 3.3 70B) afin de produire une analyse de cause racine, un score de risque et des suggestions de correction priorisées --- le tout en moins de dix secondes. La plateforme propose également une gestion des incidents, une base de connaissances auto-alimentée, un score de santé par projet (note de A à F) et des rapports hebdomadaires agrégés, présentés dans un tableau de bord React interactif en temps réel. Elle est conteneurisée avec Docker, déployée sur Kubernetes (k3s) via Helm, et dotée d'un pipeline CI/CD Jenkins complet incluant des tests automatisés.
+
+\textbf{Mots-clés :} AIOps, CI/CD, analyse de cause racine, LLM, GitLab, Kubernetes, Jenkins, Node.js, React.
+
+\vspace{0.8cm}
+\begin{otherlanguage}{english}
+\noindent\textbf{\large Abstract}\\[6pt]
+This final year project, carried out at \textbf{Capgemini --- Altran Telnet Corporation Tunisia}, consists of designing and developing an \textbf{AIOps platform} for the automated analysis of CI/CD pipelines. The solution receives GitLab events in real time through secure webhooks, collects quality (SonarQube) and security (Trivy) reports, then submits the aggregated context to a Large Language Model (Groq --- Llama 3.3 70B) to produce a root-cause analysis, a risk score and prioritized fix suggestions, all in under ten seconds. The platform also integrates incident management, a self-feeding knowledge base, a per-project health score (grade A to F) and weekly reports, presented in a real-time React dashboard. It is containerized with Docker, deployed on Kubernetes (k3s) via Helm, and equipped with a complete Jenkins CI/CD pipeline.
+
+\noindent\textbf{Keywords:} AIOps, CI/CD, root-cause analysis, LLM, GitLab, Kubernetes, Jenkins, Node.js, React.
+\end{otherlanguage}
+
+%--------------------------- TABLES ---------------------------------
+\tableofcontents
+\listoffigures
+\listoftables
+
+%--------------------------- ABRÉVIATIONS --------------------------
+\chapter*{Liste des Abréviations}\addcontentsline{toc}{chapter}{Liste des Abréviations}
+\begin{description}[leftmargin=3.4cm,style=nextline,labelwidth=3.2cm,font=\bfseries\color{primary}]
+  \item[AIOps] Artificial Intelligence for IT Operations
+  \item[CI/CD] Intégration Continue / Déploiement Continu (Continuous Integration / Continuous Deployment)
+  \item[LLM] Grand Modèle de Langage (Large Language Model)
+  \item[RBAC] Contrôle d'Accès Basé sur les Rôles (Role-Based Access Control)
+  \item[JWT] JSON Web Token
+  \item[HMAC] Code d'Authentification de Message basé sur un Hachage (Hash-based Message Authentication Code)
+  \item[MTTR] Délai Moyen de Résolution (Mean Time To Resolve)
+  \item[CVE] Vulnérabilités et Expositions Communes (Common Vulnerabilities and Exposures)
+  \item[MR] Demande de Fusion (Merge Request)
+  \item[API] Interface de Programmation d'Application (Application Programming Interface)
+  \item[ODM] Mappeur Objet-Document (Object Document Mapper)
+  \item[SPA] Application Monopage (Single Page Application)
+  \item[PVC] Demande de Volume Persistant (Persistent Volume Claim)
+  \item[k3s] Distribution Kubernetes légère
+  \item[KB] Base de Connaissances (Knowledge Base)
+\end{description}
+
+%====================================================================
+\cleardoublepage
+\pagenumbering{arabic}
+%====================================================================
+
+%--------------------- INTRODUCTION GÉNÉRALE -------------------------
+\chapter*{Introduction Générale}\addcontentsline{toc}{chapter}{Introduction Générale}
+\markboth{Introduction Générale}{}
+L'ingénierie logicielle moderne repose largement sur les méthodologies DevOps, qui rapprochent les équipes de développement et d'exploitation afin de livrer plus rapidement et de manière plus fiable. Au cœur de cette approche, les pipelines d'Intégration Continue et de Déploiement Continu (CI/CD) automatisent la construction, les tests et la mise en production des logiciels. Cette automatisation a néanmoins une contrepartie : elle produit une quantité considérable de données techniques --- journaux d'exécution, rapports de qualité de code, analyses de vulnérabilités --- dont l'exploitation manuelle devient rapidement ingérable.
+
+Lorsqu'un pipeline échoue, l'ingénieur doit parcourir des milliers de lignes de journaux, croiser les résultats de plusieurs outils hétérogènes et identifier seul la cause racine. Ce diagnostic prend en moyenne 30 à 90 minutes par incident, souvent pour des problèmes récurrents déjà résolus dans le passé mais jamais capitalisés.
+
+C'est dans ce contexte que s'inscrit le présent projet de fin d'études, qui propose une \textbf{plateforme AIOps} appliquant l'intelligence artificielle à la supervision des pipelines CI/CD. L'objectif est d'automatiser l'analyse, de centraliser les sources de données, de fournir un diagnostic de cause racine assisté par IA, et de capitaliser les solutions récurrentes.
+
+Ce rapport est organisé en sept chapitres. Le \textbf{premier chapitre} présente le contexte général, l'organisme d'accueil, l'étude de l'existant et la solution proposée. Le \textbf{deuxième chapitre} dresse un état de l'art et positionne la contribution du projet par rapport aux travaux commerciaux et académiques existants. Le \textbf{troisième chapitre} couvre l'analyse et la spécification des besoins fonctionnels et non fonctionnels. Le \textbf{quatrième chapitre} détaille la conception de la solution, son architecture, ses modèles de données, ses services et ses API. Le \textbf{cinquième chapitre} décrit l'implémentation, les tests, le déploiement (Docker, Helm, Kubernetes, Jenkins) et les résultats obtenus. Le \textbf{sixième chapitre} discute de manière critique les limites de la solution et les mesures d'atténuation identifiées. Enfin, le \textbf{septième chapitre} couvre les aspects de gestion de projet (découpage des travaux, registre des risques), avant la conclusion générale, les perspectives futures et les annexes.
+
+%====================================================================
+\chapter{Contexte Général et Problématique}\label{chap:context}
+%====================================================================
+\section{Introduction}
+Ce chapitre pose le cadre du projet. Il présente l'organisme d'accueil, analyse la situation actuelle et ses limites, et présente la solution proposée ainsi que la méthodologie de travail.
+
+\section{Organisme d'Accueil}
+Ce projet a été réalisé au sein de \textbf{Capgemini --- Altran Telnet Corporation (ATC) Tunisie}. ATC est une coentreprise créée en 2008 entre le groupe Altran et le groupe tunisien Telnet Holding. L'entreprise est spécialisée dans l'ingénierie et le développement de logiciels embarqués et de systèmes temps réel, notamment pour les secteurs de la défense, de la sécurité, de l'aéronautique et de l'automobile.
+
+Suite au rachat d'Altran par le groupe Capgemini en 2020, l'entité a progressivement rejoint la marque \textbf{Capgemini Engineering}, la branche d'activité dédiée aux services d'ingénierie et de R\&D au sein du groupe Capgemini. Capgemini est aujourd'hui un leader mondial du conseil, des services technologiques et de la transformation numérique, présent dans plus de 50 pays. Localement, ATC accompagne plusieurs entreprises clientes internationales dans leur transformation DevOps et platform-engineering, où les équipes d'ingénierie font face quotidiennement à des pipelines CI/CD défaillants --- précisément le point de douleur opérationnel adressé par ce projet.
+
+\subsection{Positionnement organisationnel}
+La Figure~\ref{fig:orgchart} situe le stage au sein de l'organisation d'ingénierie de l'entreprise. Le projet a été hébergé par une unité DevOps/Platform Engineering, elle-même rattachée à un département d'ingénierie logicielle reportant à la direction de Capgemini Engineering Tunisie. Cette unité est notamment responsable du maintien de l'outillage CI/CD (GitLab, Jenkins, SonarQube) utilisé par plusieurs équipes d'ingénierie en charge de projets clients --- ce qui en faisait le sponsor naturel d'une initiative AIOps visant précisément ces pipelines.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.5cm,every node/.style={transform shape}]
+  \node[blockdark] (dir) {Capgemini Engineering Tunisie\\(Direction pays)};
+  \node[block, below=0.9cm of dir] (dept) {Département Ingénierie Logicielle};
+  \node[block, below left=0.9cm and 1.6cm of dept] (devops) {Unité DevOps / Platform\\Engineering};
+  \node[block, below right=0.9cm and 1.6cm of dept] (delivery) {Équipes de Delivery\\Client (embarqué, automobile)};
+  \node[blockalt, below=0.9cm of devops] (intern) {Stagiaire PFE\\(ce projet)};
+
+  \draw[flowarrow] (dir) -- (dept);
+  \draw[flowarrow] (dept) -- (devops);
+  \draw[flowarrow] (dept) -- (delivery);
+  \draw[flowarrow] (devops) -- (intern);
+  \draw[flowarrow,dashed] (delivery) -- node[right,font=\tiny\sffamily]{pipelines supervisés} (intern);
+\end{tikzpicture}
+\caption{Positionnement organisationnel simplifié du stage}\label{fig:orgchart}
+\end{figure}
+
+\subsection{Analyse des parties prenantes}
+Le Tableau~\ref{tab:stakeholders} identifie les parties prenantes du projet et leur intérêt et influence respectifs, qui ont guidé les décisions de priorisation tout au long des sprints (par exemple, le tableau de bord et l'analyse de cause racine ont été priorisés par rapport au rapport hebdomadaire car ils servent directement la partie prenante ayant la plus forte influence).
+\begin{table}[H]\centering
+\caption{Analyse des parties prenantes}\label{tab:stakeholders}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.4cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.8cm} Y}
+\toprule
+\rowcolor{primarylight} Partie prenante & Intérêt & Influence & Attente \\
+\midrule
+Responsable de l'unité DevOps & Élevé & Élevée & Réduire le temps que les ingénieurs passent à trier les échecs de pipeline \\
+Ingénieurs de delivery client & Élevé & Moyenne & Diagnostic plus rapide et plus clair sans apprendre un nouvel outil \\
+Encadrant académique (ESPRIT) & Moyen & Élevée & Méthodologie rigoureuse, résultats mesurables, architecture solide \\
+Responsable Sécurité/Conformité & Moyen & Moyenne & Aucune fuite de secrets vers des API LLM tierces \\
+Stagiaire PFE (auteur) & Élevé & Moyenne & Livrer un projet de fin d'études de niveau production, défendable \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Analyse SWOT de l'initiative}
+\begin{table}[H]\centering
+\caption{Analyse SWOT}\label{tab:swot}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.0cm} Y}
+\toprule
+\rowcolor{primarylight} Forces & Automatisation de bout en bout (de l'ingestion à la suggestion de correction) ; base de connaissances auto-alimentée réduisant le coût LLM récurrent dans le temps ; entièrement conteneurisée et reproductible sur Kubernetes \\
+\midrule
+Faiblesses & Dépendance à un fournisseur LLM tiers pour l'analyse centrale ; déploiement à réplique unique dans l'environnement de laboratoire actuel ; couverture de tests automatisés limitée au-delà des tests unitaires \\
+\midrule
+Opportunités & Extensible à d'autres plateformes CI/CD (GitHub Actions, Azure DevOps) ; intégration potentielle avec les piles d'observabilité existantes (Prometheus/Grafana) déjà utilisées par l'entreprise \\
+\midrule
+Menaces & Évolution de la tarification ou des limites de débit des API LLM ; contraintes de confidentialité des données sur l'envoi d'extraits de journaux à une API externe pour des projets clients soumis à des exigences de conformité strictes \\
+\bottomrule
+\end{tabularx}
+\end{table}
+Ces faiblesses et menaces sont reprises en détail, avec des mesures d'atténuation concrètes, dans le chapitre dédié à la Discussion Critique en fin de rapport.
+
+\section{Étude de l'Existant}
+Dans la pratique actuelle, le diagnostic d'un pipeline en échec repose sur un processus entièrement manuel. L'ingénieur doit :
+\begin{itemize}[leftmargin=1.4em]
+  \item parcourir manuellement des milliers de lignes de journaux CI ;
+  \item croiser les résultats de plusieurs outils indépendants (GitLab CI, SonarQube, Trivy) dans des interfaces séparées ;
+  \item identifier la cause racine sans aucune assistance automatisée ;
+  \item gérer les incidents sans traçabilité centralisée ;
+  \item perdre du temps sur des problèmes récurrents dont les solutions ne sont pas documentées.
+\end{itemize}
+Par ailleurs, plusieurs outils existent sur le marché mais restent cloisonnés : GitLab CI fournit les journaux, SonarQube analyse la qualité du code, Trivy détecte les vulnérabilités d'images, tandis que les piles d'observabilité classiques (Prometheus, Grafana, ELK) se concentrent sur les métriques d'infrastructure plutôt que sur le diagnostic de cause racine au niveau du pipeline. Les plateformes APM/AIOps commerciales (Datadog, Dynatrace) offrent des capacités avancées mais restent coûteuses, génériques, et non adaptées à l'analyse des échecs spécifiques au CI/CD.
+
+\section{Critique de l'Existant}
+L'analyse met en évidence les limites suivantes :
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Données dispersées} et jamais corrélées entre les sources ;
+  \item \textbf{Absence d'analyse de cause racine automatisée et contextualisée} ;
+  \item \textbf{Absence de mémorisation} des solutions aux problèmes récurrents ;
+  \item \textbf{Alerte sans diagnostic}, qui signale les échecs sans en expliquer l'origine ;
+  \item \textbf{Temps de diagnostic élevé} (30 à 90 minutes) et faible traçabilité des incidents.
+\end{itemize}
+
+Pour rendre cette critique mesurable plutôt qu'anecdotique, un exercice informel de suivi du temps a été mené durant le premier sprint : cinq échecs de pipeline récents traités manuellement par l'équipe d'accueil ont été chronométrés de bout en bout et décomposés selon les phases du Tableau~\ref{tab:painpoints}. Cette décomposition montre que plus de la moitié du temps de diagnostic est consacrée simplement à \emph{localiser} l'information pertinente à travers les outils, avant même que ne commence le raisonnement sur la cause racine --- précisément la phase qu'une plateforme AIOps peut compresser à quelques secondes.
+
+\begin{table}[H]\centering
+\caption{Décomposition du temps de diagnostic manuel (moyenne sur 5 incidents observés)}\label{tab:painpoints}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{5.0cm} >{\centering\arraybackslash}p{2.6cm} Y}
+\toprule
+\rowcolor{primarylight} Phase & Temps moyen & Observation \\
+\midrule
+Localiser le job en échec et lire les journaux bruts & 12--20 min & Les journaux sont paginés et non cherchables entre les jobs \\
+Vérification croisée des tableaux de bord SonarQube / Trivy & 8--15 min & Connexion séparée, interface séparée, aucun lien depuis le journal CI \\
+Formuler et tester une hypothèse & 8--40 min & Très variable ; répété pour des erreurs déjà rencontrées \\
+Communiquer le constat (Slack, ticket) & 2--15 min & Aucun enregistrement persistant et cherchable pour la prochaine fois \\
+\midrule
+\textbf{Total} & \textbf{30--90 min} & Correspond à la fourchette énoncée dans l'objectif O1 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Solution Proposée}
+Pour répondre à ces limites, nous proposons une \textbf{plateforme AIOps} qui automatise l'analyse des pipelines CI/CD, centralise les résultats de GitLab CI, SonarQube et Trivy dans une interface unique, mémorise les solutions dans une base de connaissances auto-alimentée, mesure en continu la santé des projets, et gère les incidents avec une traçabilité complète et des post-mortems générés par IA. Le Tableau~\ref{tab:objectives} résume les objectifs du projet.
+
+\begin{table}[H]\centering
+\caption{Objectifs du projet}\label{tab:objectives}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}c Y}
+\toprule
+\rowcolor{primarylight} ID & Description \\
+\midrule
+O1 & Réduire le temps de diagnostic des pipelines de 30--90 min à moins de 2 min grâce à l'IA \\
+O2 & Centraliser les données GitLab CI, SonarQube et Trivy dans une interface unique \\
+O3 & Fournir une analyse de cause racine par IA avec des suggestions de correction priorisées par sévérité \\
+O4 & Détecter et alerter sur les vulnérabilités de sécurité des conteneurs (CVE Trivy) \\
+O5 & Apprendre les solutions récurrentes dans une base de connaissances, évitant les appels LLM répétés \\
+O6 & Offrir un score de santé par projet pour un pilotage continu de la qualité \\
+O7 & Gérer le cycle de vie des incidents avec des post-mortems générés par IA \\
+O8 & Évaluer le risque d'une Merge Request avant fusion, avec un commentaire automatique \\
+O9 & Produire des rapports hebdomadaires agrégés de métriques DevOps \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Méthodologie de Travail}\label{sec:workingmethodology}
+Le projet a été conduit selon une approche agile inspirée de \textbf{Scrum}, organisée en huit sprints itératifs de trois semaines environ chacun, répartis sur l'année académique 2025--2026. Chaque sprint a livré un incrément fonctionnel (ingestion des webhooks, analyse IA, tableau de bord, score de santé, incidents, base de connaissances, conteneurisation, CI/CD), validé avant de passer au suivant. La Figure~\ref{fig:gantt} présente la planification du projet qui en résulte.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=1.45cm,y=0.85cm,font=\sffamily\scriptsize]
+  % Axe des mois
+  \foreach \i/\m in {0/Oct,1/Nov,2/Déc,3/Jan,4/Fév,5/Mar,6/Avr,7/Mai}{
+    \node[font=\sffamily\scriptsize\bfseries,primary] at (\i+0.5,8.3) {\m};
+    \draw[lgrey] (\i,8.0) -- (\i,0.2);
+  }
+  \draw[primary,thick] (0,8.0) -- (8,8.0);
+  % Lignes de sprint, dessinées explicitement : (début,longueur,ligne,étiquette,couleur)
+  \fill[primary!25,draw=primary,thick,rounded corners=1pt] (0,7.15) rectangle (1.0,7.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,7.5) {S1 -- Ingestion webhook \& API centrale};
+
+  \fill[accent!25,draw=accent,thick,rounded corners=1pt] (0.8,6.15) rectangle (2.0,6.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,6.5) {S2 -- Analyse IA (Groq/Claude)};
+
+  \fill[primary!25,draw=primary,thick,rounded corners=1pt] (1.6,5.15) rectangle (3.0,5.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,5.5) {S3 -- Tableau de bord React};
+
+  \fill[accent!25,draw=accent,thick,rounded corners=1pt] (2.8,4.15) rectangle (4.0,4.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,4.5) {S4 -- Score de santé \& Incidents};
+
+  \fill[primary!25,draw=primary,thick,rounded corners=1pt] (3.6,3.15) rectangle (4.8,3.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,3.5) {S5 -- Base de connaissances \& Rapports};
+
+  \fill[accent!25,draw=accent,thick,rounded corners=1pt] (4.6,2.15) rectangle (5.6,2.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,2.5) {S6 -- Tests automatisés (Vitest)};
+
+  \fill[primary!25,draw=primary,thick,rounded corners=1pt] (5.2,1.15) rectangle (6.6,1.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,1.5) {S7 -- Docker, Helm, k3s};
+
+  \fill[accent!25,draw=accent,thick,rounded corners=1pt] (6.2,0.15) rectangle (7.8,0.85);
+  \node[anchor=west,font=\sffamily\tiny] at (8.1,0.5) {S8 -- CI/CD Jenkins \& Rapport};
+\end{tikzpicture}
+\caption{Diagramme de Gantt du projet (année académique 2025--2026)}\label{fig:gantt}
+\end{figure}
+
+\section{Conclusion}
+Ce chapitre a introduit le contexte du projet, l'organisme d'accueil et les limites qui justifient la solution proposée. Avant de spécifier les besoins, le chapitre suivant dresse un état de l'art sur la manière dont les travaux commerciaux et académiques existants abordent --- partiellement --- le même problème, afin de positionner précisément la contribution de ce projet.
+
+%====================================================================
+\chapter{État de l'Art et Étude Comparative}\label{chap:soa}
+%====================================================================
+\section{Introduction}
+L'AIOps est un domaine commercial et de recherche actif. Ce chapitre dresse un état de l'art des principales catégories de solutions existantes --- suites AIOps/APM commerciales, outillage natif CI/CD, et travaux académiques sur l'analyse de cause racine basée sur les journaux --- et positionne la contribution de ce projet par rapport à chacune.
+
+\section{Plateformes AIOps et d'Observabilité Commerciales}
+\subsection{Datadog et Dynatrace}
+Datadog et Dynatrace sont les deux suites commerciales dominantes de supervision de la performance applicative (Application Performance Monitoring, APM) dotées de modules AIOps (Datadog Watchdog, Dynatrace Davis AI). Les deux excellent dans la détection d'anomalies au niveau de l'infrastructure et des applications (pics de latence, déviations de taux d'erreur) à l'aide de modèles statistiques et de machine learning entraînés sur des métriques et des traces. Cependant, aucune des deux n'est conçue autour de la sémantique des \emph{pipelines CI/CD} : elles n'analysent pas nativement les journaux de jobs GitLab/GitHub CI, ne croisent pas une quality gate SonarQube avec un scan de CVE Trivy pour le même commit, et leurs récits de cause racine sont générés à partir d'une corrélation de télémétrie plutôt que d'une lecture par IA générative du contexte réel de l'échec. Elles sont également tarifées par hôte/conteneur ingéré, ce qui les rend coûteuses pour un usage centré sur les pipelines CI plutôt que sur l'infrastructure de production.
+
+\subsection{Moogsoft et BigPanda}
+Moogsoft et BigPanda se concentrent sur la \emph{corrélation d'alertes} : déduplication et regroupement de milliers d'alertes de supervision en un nombre réduit d'incidents exploitables. Ceci est conceptuellement proche du service de corrélation implémenté dans ce projet, mais opère néanmoins au niveau des alertes d'infrastructure, et non au niveau des échecs de pipeline CI/CD, et ne produit ni explication de cause racine en langage naturel ni suggestion de correction concrète au niveau du code.
+
+\subsection{PagerDuty / Jeli et les outils de gestion d'incidents}
+PagerDuty (et son acquisition Jeli) proposent une gestion mature du cycle de vie des incidents avec chronologies, escalade d'astreinte et revues post-incident --- directement comparables au modèle Incident et à la fonctionnalité de post-mortem de ce projet. Leurs post-mortems restent néanmoins des modèles rédigés manuellement ; ils ne génèrent pas automatiquement un brouillon de post-mortem à partir d'un LLM lisant la chronologie de l'incident et la cause technique associée, ce que ce projet automatise.
+
+\section{Outillage Natif CI/CD}
+GitLab CI, SonarQube et Trivy --- les trois sources de données intégrées par cette plateforme --- résolvent chacun isolément une tranche du problème : GitLab CI exécute et journalise le pipeline, SonarQube évalue la qualité statique du code, et Trivy analyse les images de conteneurs pour des CVE connues. Aucun des trois ne corrèle sa propre sortie avec les deux autres, et aucun ne raisonne sur la cause racine d'un échec ; ils rapportent \emph{ce qui} s'est passé, jamais \emph{pourquoi}, ni ce qu'il convient de faire. Les résumés d'échec « Copilot for pipelines » / GitHub Actions de GitHub (annoncés en 2024) vont dans le même sens que ce projet mais restent liés à l'écosystème GitHub et, au moment de la rédaction, ne résument qu'un seul journal de job sans corrélation inter-outils ni base de connaissances persistante et cherchable.
+
+\section{Fondements Académiques : LLM pour l'Analyse de Journaux et le RCA}
+Des travaux académiques récents (par exemple des études sur la détection d'anomalies de journaux de type LogGPT, et sur l'utilisation de LLM pour la synthèse de cause racine d'incidents dans les opérations cloud à grande échelle~\cite{gartner}) confirment deux constats directement pertinents pour la conception de ce projet : (1) les LLM généralistes, lorsqu'on leur fournit un contexte bien structuré (des extraits de journaux pertinents plutôt que des journaux bruts entiers), obtiennent des performances compétitives par rapport à des modèles spécialisés d'analyse de journaux pour la classification de cause racine, ce qui justifie l'étape de normalisation/corrélation avant l'appel au LLM plutôt que l'envoi direct des journaux bruts ; et (2) la mise en cache/mémorisation des motifs déjà diagnostiqués réduit sensiblement le coût et la latence pour les échecs récurrents --- exactement le raisonnement à l'origine du service de base de connaissances de ce projet.
+
+\section{Synthèse Comparative}
+Le Tableau~\ref{tab:soa} résume la comparaison selon les dimensions les plus pertinentes pour les objectifs du projet (Tableau~\ref{tab:objectives}).
+\begin{table}[H]\centering
+\caption{Synthèse comparative des approches existantes}\label{tab:soa}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.0cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.9cm} >{\centering\arraybackslash}p{1.9cm} Y}
+\toprule
+\rowcolor{primarylight} Solution & Conscient du CI/CD & Corrélation multi-source & Cause racine IA (générative) & KB auto-alimentée & Profil de coût \\
+\midrule
+Datadog / Dynatrace & Non & Partielle (infra. seule) & Non (statistique) & Non & Élevé (par hôte) \\
+Moogsoft / BigPanda & Non & Oui (alertes) & Non & Non & Élevé \\
+PagerDuty / Jeli & Partiel & Non & Non & Non (manuelle) & Moyen \\
+GitHub Copilot pour CI & Oui & Non & Partielle (source unique) & Non & Inclus dans l'offre \\
+\textbf{Ce projet} & \textbf{Oui} & \textbf{Oui (GitLab+Sonar+Trivy)} & \textbf{Oui (LLM)} & \textbf{Oui} & \textbf{Faible (API LLM + cache)} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Positionnement de la Contribution}
+Ce projet ne prétend pas surpasser les suites APM commerciales matures sur la détection d'anomalies au niveau de l'infrastructure, ce qui n'est pas son objectif. Sa contribution est plus restreinte et plus spécifique : une plateforme de cause racine native CI/CD, à corrélation multi-source, assistée par IA générative, dotée d'un mécanisme de mémoire organisationnelle (la base de connaissances), livrée pour une fraction du coût de licence des suites AIOps commerciales car elle s'appuie sur des API LLM payées à l'appel plutôt que sur des agents de supervision par hôte. Ce positionnement a directement motivé les choix architecturaux détaillés au Chapitre~\ref{chap:design}.
+
+\section{Conclusion}
+Cette étude confirme qu'aucun outil existant ne couvre l'intersection spécifique de capacités visée par les objectifs O1--O9 : ingestion native CI/CD, corrélation multi-source, analyse de cause racine générative, et base de connaissances auto-alimentée. Le chapitre suivant formalise les besoins qui opérationnalisent ce positionnement.
+
+%====================================================================
+\chapter{Analyse et Spécification des Besoins}\label{chap:requirements}
+%====================================================================
+\section{Introduction}
+Ce chapitre identifie les acteurs de la plateforme, liste les besoins fonctionnels et non fonctionnels, et les formalise par une modélisation en cas d'utilisation.
+
+\section{Identification des Acteurs}
+La plateforme s'appuie sur un contrôle d'accès basé sur les rôles (RBAC) à trois niveaux :
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Administrateur} : toutes les opérations (suppression, recalcul, configuration) ;
+  \item \textbf{Analyste} : analyses, résolution, commentaires et post-mortems ;
+  \item \textbf{Lecteur (Viewer)} : accès en lecture seule.
+\end{itemize}
+Un \textbf{acteur système} est également impliqué : le serveur GitLab, qui émet les événements de pipeline et de merge request via des webhooks.
+
+\section{Besoins Fonctionnels}
+\subsection{Tableau de bord}\label{sec:dashboardreq}
+Le tableau de bord est la page d'accueil du système et doit offrir à un ingénieur, dès les premières secondes après sa connexion, une vue synthétique de l'état de tous les projets supervisés : la liste des pipelines récents avec leur statut, le taux de succès global sur les sept derniers jours sous forme de courbe de tendance, un petit ensemble d'indicateurs clés de performance (incidents actifs, MTTR moyen, vulnérabilités critiques ouvertes), une liste classée des principaux problèmes récurrents à travers les projets, et un flux en direct de notifications poussées via WebSocket à mesure que de nouvelles analyses se terminent. Le tableau de bord doit rester utilisable avec un filtre de projet global, car un ingénieur s'intéresse généralement à un sous-ensemble des projets supervisés plutôt qu'à l'ensemble du parc.
+
+\subsection{Gestion des pipelines}
+Le système doit exposer une liste paginée et filtrable des pipelines (filtrable par statut, branche, projet et plage de dates), car le nombre de pipelines croît continuellement et une liste non bornée ne serait pas évolutive. Sélectionner un pipeline doit révéler son détail complet : la liste des jobs et leur statut individuel, les journaux bruts des jobs en échec, et --- lorsqu'elle est disponible --- l'analyse IA associée. Un analyste doit également pouvoir redéclencher manuellement l'analyse d'un pipeline donné, par exemple après avoir corrigé la configuration de l'outil sous-jacent et souhaitant confirmer l'exactitude du diagnostic.
+
+\subsection{Analyse IA --- Analyse de Cause Racine}
+Pour chaque pipeline analysé, le système doit classer l'échec dans l'un des types d'erreur prédéfinis (échec de build, échec de test, problème de dépendance, vulnérabilité de sécurité, erreur de configuration, ou inconnu), produire une explication en langage naturel de la cause racine, attribuer un niveau de risque (critique/élevé/moyen/faible) accompagné d'un score de confiance numérique, et proposer une ou plusieurs suggestions de correction priorisées par sévérité, chacune pouvant inclure une commande shell prête à exécuter ou un indice de code. Le système doit également lister les fichiers identifiés comme affectés, et doit détecter quand un échec correspond à un motif déjà rencontré afin que la vue des problèmes récurrents (Section~\ref{sec:dashboardreq}, Tableau de bord) puisse le mettre en évidence.
+
+\subsection{Sécurité et qualité du code}
+Le système doit intégrer les résultats du scan de vulnérabilités Trivy, en exposant des compteurs de sévérité (critique/élevé/moyen/faible), la liste complète des CVE détectées avec les informations de paquet et de version corrigée, et un flux de travail permettant de marquer une vulnérabilité donnée comme acquittée ou ignorée. Il doit également intégrer les métriques SonarQube --- statut de la quality gate, nombre de bugs, nombre de vulnérabilités, nombre de code smells et couverture de tests --- car celles-ci alimentent directement le calcul du score de santé (Section~\ref{sec:healthscoreservice}) et le contexte de l'analyse IA.
+
+\subsection{Base de connaissances}
+Chaque fois qu'un analyste résout une analyse, le système doit automatiquement mémoriser la solution validée sous une signature unique dérivée du type d'erreur et de la cause racine, afin qu'une future occurrence de la même erreur soit traitée instantanément depuis le cache plutôt que de déclencher un nouvel appel LLM, plus coûteux. La base de connaissances doit également être parcourable et cherchable de façon indépendante (recherche en texte intégral, sur le titre, les tags, le type d'erreur et la cause racine) afin qu'un analyste puisse la consulter de manière proactive avant même d'attendre une analyse automatisée.
+
+\subsection{Score de santé, incidents et rapports}
+Le système doit calculer en continu, par projet, un score de santé composite entre 0 et 100, traduit en une note de A à F, et doit exposer sa décomposition complète (les six métriques pondérées du Tableau~\ref{tab:health}) plutôt que le seul score, afin qu'un ingénieur comprenne \emph{pourquoi} un projet est noté ainsi. Les pipelines en échec doivent automatiquement ouvrir un incident, que le système suit selon un cycle de vie (ouvert $\rightarrow$ en investigation $\rightarrow$ résolu) avec une chronologie horodatée, un calcul de MTTR, et un post-mortem généré par IA à la demande une fois résolu. Les merge requests ouvertes doivent recevoir un commentaire de risque automatique résumant la dernière analyse. Enfin, le système doit produire un rapport hebdomadaire agrégé par projet, comparable d'une semaine à l'autre, résumant le volume de pipelines, le taux de succès, les nouvelles vulnérabilités et le nombre d'incidents.
+
+\section{Besoins Non Fonctionnels}
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Sécurité} : authentification JWT, RBAC à trois niveaux, validation HMAC-SHA256 des webhooks, hachage Bcrypt, en-têtes de sécurité HTTP.
+  \item \textbf{Performance} : analyse de pipeline en moins de dix secondes.
+  \item \textbf{Temps réel} : mise à jour du tableau de bord via WebSocket.
+  \item \textbf{Scalabilité} : traitement asynchrone via des files de messages et des workers concurrents.
+  \item \textbf{Fiabilité} : reprise sur erreur avec réessais et backoff exponentiel.
+  \item \textbf{Maintenabilité} : architecture en couches, code modulaire et documenté.
+  \item \textbf{Portabilité} : conteneurisation complète et déploiement Kubernetes reproductible.
+\end{itemize}
+
+Chaque exigence qualitative ci-dessus est reformulée dans le Tableau~\ref{tab:nfr} sous forme de critère d'acceptation mesurable, accompagné de la méthode de vérification effectivement utilisée durant ce projet (test, mesure, ou inspection de code), afin que les résultats rapportés au Chapitre~\ref{chap:implementation} puissent être vérifiés par rapport à une cible explicite plutôt qu'à une intention vague.
+\begin{table}[H]\centering
+\caption{Besoins non fonctionnels avec critères d'acceptation mesurables}\label{tab:nfr}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{2.6cm} Y >{\centering\arraybackslash}p{3.0cm}}
+\toprule
+\rowcolor{primarylight} BNF & Critère d'acceptation mesurable & Méthode de vérification \\
+\midrule
+Sécurité & 100\% des requêtes webhook à signature HMAC invalide rejetées avec HTTP 401 ; mots de passe jamais stockés en clair & Test d'intrusion manuel + revue de code \\
+Performance & Analyse de bout en bout (webhook reçu $\rightarrow$ résultat persisté) $<$10\,s sur 95\% des pipelines observés & Journalisation d'horodatage sur plus de 20 exécutions réelles \\
+Temps réel & Le tableau de bord reflète une nouvelle analyse dans les 500\,ms suivant sa fin & Mesure de l'onglet réseau du navigateur \\
+Scalabilité & Le backend reste sans état (stateless) ; le scale-out horizontal a été validé en exécutant 2 réplicas du worker simultanément sans duplication de job & Test de charge manuel avec \texttt{kubectl scale} \\
+Fiabilité & Un échec transitoire d'API GitLab/SonarQube/Trivy est réessayé jusqu'à 3 fois avant que le job ne soit marqué en échec & Injection de fautes (réponses 500 forcées) \\
+Maintenabilité & Chaque module de service expose $\leq$10 fonctions publiques et a une responsabilité unique & Revue de code par rapport à l'architecture de la Figure~\ref{fig:services} \\
+Portabilité & La pile complète démarre depuis un cluster k3s vierge avec une seule commande \texttt{helm install} & Redéploiement manuel complet \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Comportement Fonctionnel : Diagramme d'Activité}
+Au-delà de la liste d'étapes du Tableau~\ref{tab:flow} (détaillée au Chapitre~\ref{chap:design}), la Figure~\ref{fig:activity} modélise la logique de décision du worker d'analyse de pipeline sous forme de diagramme d'activité UML, en explicitant les deux branches conditionnelles facilement négligées dans une lecture purement séquentielle : la branche de succès/échec du cache de la base de connaissances, et la branche de succès/échec du pipeline qui détermine si un incident est créé.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.55cm,every node/.style={transform shape}]
+  \node[blockdark,rounded corners=10pt] (start) {Webhook reçu};
+  \node[block, below=of start] (collect) {Collecte logs, SonarQube,\\Trivy, commits};
+  \node[block, below=of collect] (normalize) {Normalisation \& corrélation};
+  \node[diamond,draw=primary,thick,fill=primarylight,below=of normalize,inner sep=1pt,font=\sffamily\tiny,align=center,minimum width=2.6cm] (decision1) {Cache KB\\trouvé ?};
+  \node[block, below left=0.7cm and 1.4cm of decision1] (reuse) {Réutiliser la solution\\mémorisée};
+  \node[block, below right=0.7cm and 1.4cm of decision1] (llm) {Appeler le LLM (classifier\\$\rightarrow$ analyser $\rightarrow$ suggérer)};
+  \node[block, below=2.1cm of decision1] (persist) {Persister l'analyse\\+ mettre à jour le Score de Santé};
+  \node[diamond,draw=primary,thick,fill=primarylight,below=of persist,inner sep=1pt,font=\sffamily\tiny,align=center,minimum width=2.6cm] (decision2) {Pipeline\\en échec ?};
+  \node[block, below left=0.7cm and 1.4cm of decision2] (incident) {Créer / mettre à jour\\l'Incident};
+  \node[block, below right=0.7cm and 1.4cm of decision2] (skip) {Ignorer la création\\d'incident};
+  \node[block, below=2.1cm of decision2] (notify) {Émettre un événement WebSocket};
+  \node[blockdark,rounded corners=10pt, below=of notify] (end) {Tableau de bord mis à jour};
+
+  \draw[flowarrow] (start) -- (collect);
+  \draw[flowarrow] (collect) -- (normalize);
+  \draw[flowarrow] (normalize) -- (decision1);
+  \draw[flowarrow] (decision1) -| node[above,font=\tiny\sffamily]{oui} (reuse);
+  \draw[flowarrow] (decision1) -| node[above,font=\tiny\sffamily]{non} (llm);
+  \draw[flowarrow] (reuse) |- (persist);
+  \draw[flowarrow] (llm) |- (persist);
+  \draw[flowarrow] (persist) -- (decision2);
+  \draw[flowarrow] (decision2) -| node[above,font=\tiny\sffamily]{oui} (incident);
+  \draw[flowarrow] (decision2) -| node[above,font=\tiny\sffamily]{non} (skip);
+  \draw[flowarrow] (incident) |- (notify);
+  \draw[flowarrow] (skip) |- (notify);
+  \draw[flowarrow] (notify) -- (end);
+\end{tikzpicture}
+\caption{Diagramme d'activité du worker d'analyse de pipeline, avec ses deux branches conditionnelles}\label{fig:activity}
+\end{figure}
+
+\section{Modélisation des Cas d'Utilisation}
+La Figure~\ref{fig:usecase} présente le diagramme de cas d'utilisation global, montrant les trois rôles humains et l'acteur système GitLab interagissant avec les principales capacités de la plateforme. Les flèches de généralisation (triangle creux) expriment que \emph{Analyste} et \emph{Lecteur} héritent tous deux des capacités en lecture seule d'un \emph{Utilisateur Authentifié} de base, tandis qu'\emph{Administrateur} hérite en outre de toutes les capacités d'\emph{Analyste}. Les flèches en tirets annotées \texttt{<<include>>} désignent un sous-comportement obligatoire systématiquement déclenché par le cas d'utilisation de base, et \texttt{<<extend>>} désigne un comportement optionnel déclenché seulement sous une condition (par exemple un cache manqué).
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=1,every node/.style={transform shape}]
+  % Frontière du système
+  \draw[primary,thick,rounded corners=6pt] (1.7,-0.2) rectangle (11.6,10.0);
+  \node[primary,font=\sffamily\bfseries\small] at (6.6,9.7) {Plateforme AIOps};
+
+  % Acteurs (gauche = humains, droite = système)
+  \node[actor,primary] (admin) at (0,7.6) {Administrateur};
+  \node[actor,primary] (analyst) at (0,4.8) {Analyste};
+  \node[actor,primary] (viewer) at (0,2.0) {Lecteur};
+  \node[actor,accent] (gitlab) at (13.4,5.0) {GitLab\\(système)};
+
+  % Cas d'utilisation
+  \node[usecase] (uc1) at (3.6,8.8) {Gérer utilisateurs \& configuration};
+  \node[usecase] (uc2) at (3.6,7.4) {Voir tableau de bord \& KPI};
+  \node[usecase] (uc3) at (3.6,6.0) {Gérer les pipelines};
+  \node[usecase] (uc4) at (7.4,7.6) {Résoudre une analyse IA};
+  \node[usecase] (uc4b) at (10.2,8.6) {Alimenter la base de connaissances};
+  \node[usecase] (uc5) at (7.4,6.2) {Rechercher dans la base de connaissances};
+  \node[usecase] (uc6) at (7.4,4.8) {Gérer un incident};
+  \node[usecase] (uc6b) at (10.2,5.6) {Générer un post-mortem IA};
+  \node[usecase] (uc7) at (7.4,3.4) {Commenter les merge requests};
+  \node[usecase] (uc8) at (3.6,3.4) {Voir score de santé \& rapports};
+  \node[usecase] (uc9) at (3.6,2.0) {Parcourir les vulnérabilités};
+  \node[usecase] (uc10) at (10.2,1.6) {S'authentifier (login/refresh)};
+  \node[usecase] (uc11) at (13.4,2.4) {Envoyer un webhook pipeline / MR};
+
+  % Généralisation (héritage) entre acteurs
+  \draw[-{Triangle[open,length=3mm,width=2.6mm]},primary,thick] (admin) -- (analyst);
+  \draw[-{Triangle[open,length=3mm,width=2.6mm]},primary,thick] (analyst) -- (viewer);
+
+  % Associations acteur -- cas d'utilisation
+  \foreach \u in {uc1} \draw[primary] (admin) -- (\u);
+  \foreach \u in {uc2,uc3,uc4,uc5,uc6,uc7,uc8,uc9,uc10} \draw[primary] (analyst) -- (\u);
+  \foreach \u in {uc2,uc3,uc5,uc8,uc9,uc10} \draw[primary] (viewer) -- (\u);
+  \draw[accent,thick] (gitlab) -- (uc11);
+
+  % relations include / extend
+  \draw[accent,thick,dashed,-{Latex[length=2.2mm]}] (uc11) -- node[above,sloped,font=\tiny\sffamily]{<<include>>} (uc4);
+  \draw[accent,thick,dashed,-{Latex[length=2.2mm]}] (uc4b) -- node[above,sloped,font=\tiny\sffamily]{<<extend>>} (uc4);
+  \draw[accent,thick,dashed,-{Latex[length=2.2mm]}] (uc6b) -- node[above,sloped,font=\tiny\sffamily]{<<extend>>} (uc6);
+  \draw[accent,thick,dashed,-{Latex[length=2.2mm]}] (uc7) -- node[above,sloped,font=\tiny\sffamily]{<<include>>} (uc10);
+\end{tikzpicture}
+\caption{Diagramme de cas d'utilisation global avec relations de généralisation, include et extend}\label{fig:usecase}
+\end{figure}
+
+\subsection{Raffinement des cas d'utilisation}
+Les Tableaux~\ref{tab:uc}, \ref{tab:uc2}, \ref{tab:uc3} et \ref{tab:uc4} décrivent textuellement les quatre cas d'utilisation les plus critiques du système.
+\begin{table}[H]\centering
+\caption{Description du cas d'utilisation : « Analyser un pipeline en échec »}\label{tab:uc}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.2cm} Y}
+\toprule
+\rowcolor{primarylight} Élément & Description \\
+\midrule
+Acteur principal & Serveur GitLab (système), Analyste \\
+Acteurs secondaires & LLM Groq/Claude, SonarQube, Trivy \\
+Précondition & Un pipeline s'est terminé sur un projet supervisé ; le secret du webhook est configuré \\
+Scénario principal & 1. GitLab émet un webhook signé. 2. Le système valide la signature HMAC. 3. Un job d'analyse est mis en file (202 Accepted). 4. Le worker collecte les journaux, les anomalies SonarQube, les CVE Trivy et les commits. 5. Le système normalise et corrèle les données. 6. \emph{<<include>>} la base de connaissances est interrogée par signature. 7. En cas de cache manqué, le LLM classe l'erreur et produit la cause racine et les suggestions de correction. 8. Le résultat est persisté et diffusé en temps réel. \\
+Postcondition & Une analyse est disponible ; un incident est créé automatiquement si le pipeline a échoué \\
+Flux alternatif & Cache trouvé à l'étape 6 : la solution mémorisée est réutilisée, les étapes sont ignorées, le LLM n'est pas appelé \\
+Exceptions & Signature HMAC invalide (requête rejetée, 401) ; délai d'attente dépassé sur l'API GitLab/SonarQube/Trivy (réessayé 3 fois avec backoff exponentiel) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]\centering
+\caption{Description du cas d'utilisation : « Résoudre une analyse IA »}\label{tab:uc2}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.2cm} Y}
+\toprule
+\rowcolor{primarylight} Élément & Description \\
+\midrule
+Acteur principal & Analyste \\
+Précondition & L'analyste est authentifié avec au moins le rôle \emph{Analyste} ; une analyse non résolue existe \\
+Scénario principal & 1. L'analyste ouvre la page de détail du pipeline. 2. L'analyste examine la cause racine IA et applique la correction suggérée. 3. L'analyste marque l'analyse comme résolue (\texttt{PATCH /api/analyses/:id/resolve}). 4. \emph{<<extend>>} le système alimente la base de connaissances avec la solution validée, indexée par la signature de l'erreur. 5. Le MTTR est calculé et stocké. \\
+Postcondition & L'analyse est marquée \texttt{resolved=true} ; la base de connaissances contient une entrée nouvelle ou mise à jour \\
+Exceptions & Rôle insuffisant (403 Forbidden) ; analyse déjà résolue (opération idempotente sans effet) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]\centering
+\caption{Description du cas d'utilisation : « Gérer un incident et générer un post-mortem »}\label{tab:uc3}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.2cm} Y}
+\toprule
+\rowcolor{primarylight} Élément & Description \\
+\midrule
+Acteur principal & Analyste \\
+Précondition & Un incident existe (créé automatiquement à partir d'une analyse de pipeline en échec) \\
+Scénario principal & 1. L'analyste ouvre le détail de l'incident (chronologie, analyse liée). 2. L'analyste met à jour le statut (ouvert $\rightarrow$ en investigation $\rightarrow$ résolu), chaque changement étant ajouté à la chronologie. 3. L'analyste peut ajouter des commentaires libres à la chronologie. 4. Une fois résolu, l'analyste déclenche la génération du post-mortem. 5. \emph{<<extend>>} le LLM résume la chronologie et l'analyse en un post-mortem structuré accompagné de recommandations. \\
+Postcondition & La chronologie de l'incident est complète ; un document post-mortem est rattaché à l'incident \\
+Exceptions & Génération de post-mortem demandée avant résolution (rejetée) ; échec de l'appel LLM (réessayé, puis dégradé vers un résumé basé sur un modèle) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]\centering
+\caption{Description du cas d'utilisation : « Commenter une merge request avec évaluation du risque »}\label{tab:uc4}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{3.2cm} Y}
+\toprule
+\rowcolor{primarylight} Élément & Description \\
+\midrule
+Acteur principal & Serveur GitLab (système) \\
+Acteur secondaire & LLM Groq/Claude \\
+Précondition & Un webhook de merge request (action \texttt{open} ou \texttt{update}) est reçu \\
+Scénario principal & 1. Le système identifie l'analyse la plus récente pour le projet cible. 2. Le service de commentaire MR calcule un score de risque de 0 à 100 à partir de la sévérité et de la confiance de l'analyse. 3. \emph{<<include>>} le système s'authentifie auprès de l'API GitLab à l'aide d'un jeton stocké. 4. Le LLM génère une explication en français de trois phrases sur le risque. 5. Le système publie un commentaire Markdown formaté sur la merge request. \\
+Postcondition & La merge request affiche un commentaire de risque automatique \\
+Exceptions & Aucune analyse encore disponible pour le projet (commentaire ignoré) ; limite de débit de l'API GitLab atteinte (commentaire différé et réessayé) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Matrice de Traçabilité des Besoins}
+Le Tableau~\ref{tab:traceability} associe chaque objectif fonctionnel défini au Chapitre~\ref{chap:context} aux fonctionnalités concrètes, points d'accès REST et cas d'utilisation qui le satisfont, garantissant qu'aucun besoin n'a été laissé sans implémentation.
+\begin{table}[H]\centering
+\caption{Matrice de traçabilité : objectifs $\rightarrow$ fonctionnalités $\rightarrow$ cas d'utilisation}\label{tab:traceability}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{primary}}p{1.0cm} Y >{\centering\arraybackslash}p{2.4cm}}
+\toprule
+\rowcolor{primarylight} Obj. & Fonctionnalité(s) implémentée(s) & Cas d'utilisation \\
+\midrule
+O1 & Analyseur de cause racine IA, pipeline asynchrone BullMQ & Tableau~\ref{tab:uc} \\
+O2 & Services GitLab/SonarQube/Trivy + normaliseur + service de corrélation & Tableau~\ref{tab:uc} \\
+O3 & \texttt{ai/rootCause.analyzer.js}, \texttt{fixSuggester.js} & Tableau~\ref{tab:uc} \\
+O4 & Service Trivy, modèle Vulnerability, panneau de sécurité & Figure~\ref{fig:services} \\
+O5 & Service de base de connaissances, cache de signatures & Tableau~\ref{tab:uc2} \\
+O6 & Service de score de santé (6 métriques pondérées, note A--F) & Section~\ref{sec:healthscoreservice} \\
+O7 & Modèle Incident, chronologie, post-mortem IA & Tableau~\ref{tab:uc3} \\
+O8 & Service de commentaire MR, calcul du risque & Tableau~\ref{tab:uc4} \\
+O9 & Service de rapport hebdomadaire, comparaison semaine sur semaine & Section~\ref{sec:otherservices} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Conclusion}
+Ce chapitre a formalisé les besoins de la plateforme à travers l'identification des acteurs, la spécification fonctionnelle et non fonctionnelle, la modélisation en cas d'utilisation et une matrice de traçabilité. Le chapitre suivant les traduit en une conception technique détaillée.
+
+%====================================================================
+\chapter{Conception et Architecture}\label{chap:design}
+%====================================================================
+\section{Introduction}
+Ce chapitre présente l'architecture globale, le flux de traitement, les modèles de données, les services métiers et la conception de l'API et du frontend.
+
+\section{Architecture Globale}
+La plateforme suit une architecture pilotée par événements (event-driven). GitLab émet un webhook à la fin de chaque pipeline (ou lors d'un événement de merge request) ; le backend valide la requête, la met en file dans une file de messages, puis des workers asynchrones effectuent la collecte, la normalisation, la corrélation et l'analyse IA. Les résultats sont persistés dans MongoDB et poussés vers le tableau de bord React en temps réel via WebSocket. La Figure~\ref{fig:archi} donne la vue globale de l'architecture.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.9cm]
+  \node[blockdark] (gitlab) {GitLab CE\\Pipelines / MR};
+  \node[blockalt, right=2.0cm of gitlab] (sonar) {SonarQube\\Qualité};
+  \node[blockalt, right=2.0cm of sonar] (trivy) {Trivy\\Scanner CVE};
+
+  \node[block, below=1.3cm of sonar, minimum width=7.2cm, minimum height=1.4cm] (backend)
+    {\textbf{Backend --- Node.js / Express}\\Webhooks, API REST, workers BullMQ};
+
+  \node[blockalt, below left=1.2cm and -0.6cm of backend] (llm) {Groq / Claude\\LLM Cause Racine};
+  \node[blockalt, below=1.2cm of backend] (redis) {Redis\\Broker BullMQ};
+  \node[blockalt, below right=1.2cm and -0.6cm of backend] (mongo) {MongoDB\\7 collections};
+
+  \node[block, below=1.6cm of redis, minimum width=7.2cm] (frontend)
+    {\textbf{Frontend --- React / Vite}\\Tableau de bord, Score de Santé, Incidents, KB};
+
+  \draw[flowarrow] (gitlab) -- node[above,font=\tiny\sffamily]{webhook (HMAC)} (backend.north -| gitlab);
+  \draw[flowarrow] (backend) -- (sonar) node[midway,right,font=\tiny\sffamily]{};
+  \draw[flowarrow] (backend) -- (trivy);
+  \draw[flowarrow] (backend) -- (llm);
+  \draw[flowarrow] (backend) -- (redis);
+  \draw[flowarrow] (backend) -- (mongo);
+  \draw[flowarrow] (backend) -- node[right,font=\tiny\sffamily]{Socket.io} (frontend);
+\end{tikzpicture}
+\caption{Architecture globale de la plateforme AIOps}\label{fig:archi}
+\end{figure}
+

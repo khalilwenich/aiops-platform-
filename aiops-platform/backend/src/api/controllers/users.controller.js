@@ -21,7 +21,7 @@ export async function create(req, res, next) {
     if (!email || !name) {
       return res.status(400).json({ error: 'Email and name are required' });
     }
-    if (!['admin', 'analyst', 'viewer'].includes(role)) {
+    if (!['admin', 'analyst', 'security', 'viewer'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
@@ -60,7 +60,7 @@ export async function update(req, res, next) {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (role) {
-      if (!['admin', 'analyst', 'viewer'].includes(role)) {
+      if (!['admin', 'analyst', 'security', 'viewer'].includes(role)) {
         return res.status(400).json({ error: 'Invalid role' });
       }
       user.role = role;
@@ -122,6 +122,8 @@ export async function getOwnProfile(req, res, next) {
         department: user.department,
         phone: user.phone,
         preferences: user.preferences,
+        subscribedProjects: user.subscribedProjects || [],
+        slackWebhook: user.slackWebhook || '',
         mustChangePassword: user.mustChangePassword,
       },
     });
@@ -132,7 +134,7 @@ export async function getOwnProfile(req, res, next) {
 
 export async function updateOwnProfile(req, res, next) {
   try {
-    const { name, title, department, phone, preferences } = req.body;
+    const { name, title, department, phone, preferences, subscribedProjects, slackWebhook } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -143,6 +145,10 @@ export async function updateOwnProfile(req, res, next) {
     if (preferences && typeof preferences === 'object') {
       user.preferences = { ...user.preferences, ...preferences };
     }
+    if (Array.isArray(subscribedProjects)) {
+      user.subscribedProjects = subscribedProjects.filter(id => typeof id === 'string');
+    }
+    if (typeof slackWebhook === 'string') user.slackWebhook = slackWebhook;
 
     await user.save();
 
@@ -156,6 +162,8 @@ export async function updateOwnProfile(req, res, next) {
         department: user.department,
         phone: user.phone,
         preferences: user.preferences,
+        subscribedProjects: user.subscribedProjects || [],
+        slackWebhook: user.slackWebhook || '',
         mustChangePassword: user.mustChangePassword,
       },
     });

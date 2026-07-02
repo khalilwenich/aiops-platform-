@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap, BookOpen, Heart, FileText, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap, BookOpen, Heart, FileText, AlertTriangle, BarChart2, PhoneCall } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/slices/authSlice.js';
 import { incidentApi } from '../../api/incident.api.js';
@@ -15,6 +15,8 @@ const NAV_ITEMS = [
   { path: '/health',     icon: Heart,            label: 'Health Score' },
   { path: '/reports',    icon: FileText,         label: 'Weekly Report' },
   { path: '/incidents',  icon: AlertTriangle,    label: 'Incidents' },
+  { path: '/metrics',    icon: BarChart2,        label: 'Métriques' },
+  { path: '/oncall',     icon: PhoneCall,        label: 'On-Call' },
   { path: '/settings',   icon: Settings,         label: 'Settings' },
 ];
 
@@ -88,7 +90,7 @@ export function Sidebar() {
               <p className="text-xs font-medium text-text-primary truncate">{user.name || user.email}</p>
               <span className={clsx(
                 'text-xs capitalize',
-                user.role === 'admin' ? 'text-indigo-400' : user.role === 'analyst' ? 'text-yellow-400' : 'text-text-muted'
+                user.role === 'admin' ? 'text-indigo-400' : user.role === 'analyst' ? 'text-yellow-400' : user.role === 'security' ? 'text-red-400' : 'text-text-muted'
               )}>
                 {user.role}
               </span>

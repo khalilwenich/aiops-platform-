@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Clock, User, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Clock, User, CheckCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { WarRoomPanel } from '../components/incident/WarRoomPanel.jsx';
 import { Spinner } from '../components/ui/Spinner.jsx';
 import { incidentApi } from '../api/incident.api.js';
@@ -10,6 +12,13 @@ const SEV_STYLE = {
   high:     'bg-orange-500/10 border-orange-500/20 text-orange-400',
   medium:   'bg-amber-500/10 border-amber-500/20 text-amber-400',
   low:      'bg-blue-500/10 border-blue-500/20 text-blue-400',
+};
+
+const STATUS_STYLE = {
+  open:          'bg-red-500/10 text-red-400',
+  acknowledged:  'bg-indigo-500/10 text-indigo-400',
+  investigating: 'bg-amber-500/10 text-amber-400',
+  resolved:      'bg-emerald-500/10 text-emerald-400',
 };
 
 export function timeSince(date) {
@@ -23,6 +32,8 @@ export function timeSince(date) {
 
 export default function Incidents() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const currentUser = useSelector(state => state.auth.user);
   const [warRoom, setWarRoom] = useState(null);
   const [showResolved, setShowResolved] = useState(false);
 
@@ -35,19 +46,26 @@ export default function Incidents() {
   const allIncidents = data?.incidents || [];
   const incidents = allIncidents.filter(i => i.status !== 'resolved');
   const resolved  = allIncidents.filter(i => i.status === 'resolved');
-  const openCount = incidents.filter(i => i.status === 'open').length;
+  const openCount         = incidents.filter(i => i.status === 'open').length;
+  const acknowledgedCount = incidents.filter(i => i.status === 'acknowledged').length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['incidents'] });
 
+  const syncWarRoom = (updated) => {
+    setWarRoom(prev => {
+      if (!prev || prev._id !== updated._id) return prev;
+      return updated.status === 'resolved' ? null : updated;
+    });
+  };
+
   const statusMutation = useMutation({
     mutationFn: ({ id, status }) => incidentApi.updateStatus(id, { status }),
-    onSuccess: (updated) => {
-      invalidate();
-      setWarRoom(prev => {
-        if (!prev || prev._id !== updated._id) return prev;
-        return updated.status === 'resolved' ? null : updated;
-      });
-    },
+    onSuccess: (updated) => { invalidate(); syncWarRoom(updated); },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ id, userId }) => incidentApi.assign(id, userId),
+    onSuccess: (updated) => { invalidate(); syncWarRoom(updated); },
   });
 
   const commentMutation = useMutation({
@@ -67,6 +85,7 @@ export default function Incidents() {
   });
 
   const handleStatusChange = (id, status) => statusMutation.mutate({ id, status });
+  const handleAssign       = (id, userId) => assignMutation.mutate({ id, userId });
   const handleAddComment   = (id, message) => commentMutation.mutate({ id, message });
   const handlePostMortem   = (id) => postMortemMutation.mutate(id);
 
@@ -96,8 +115,13 @@ export default function Incidents() {
             <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
             Open: {openCount}
           </span>
+          {acknowledgedCount > 0 && (
+            <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium px-3 py-1.5 rounded-full">
+              Acquittés: {acknowledgedCount}
+            </span>
+          )}
           <span className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium px-3 py-1.5 rounded-full">
-            Investigating: {incidents.filter(i => i.status === 'investigating').length}
+            En investigation: {incidents.filter(i => i.status === 'investigating').length}
           </span>
         </div>
       </div>
@@ -122,8 +146,8 @@ export default function Incidents() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded border ${SEV_STYLE[inc.severity]}`}>
                         {inc.severity?.toUpperCase()}
                       </span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${inc.status === 'investigating' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {inc.status}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_STYLE[inc.status] || 'bg-slate-500/10 text-slate-400'}`}>
+                        {inc.status === 'acknowledged' ? '✓ Acquitté' : inc.status}
                       </span>
                       <span className="text-xs text-slate-600">{inc.incidentId}</span>
                     </div>
@@ -131,28 +155,41 @@ export default function Incidents() {
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-1.5 text-slate-500 text-xs">
                         <Clock className="w-3.5 h-3.5" />
-                        Detected {timeSince(inc.detectedAt)}
+                        Détecté {timeSince(inc.detectedAt)}
                       </div>
-                      <div className="flex items-center gap-1.5 text-slate-500 text-xs">
-                        <User className="w-3.5 h-3.5" />
-                        {inc.assignedTo || 'Unassigned'}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <User className="w-3.5 h-3.5 text-slate-500" />
+                        {inc.assignedTo
+                          ? <span className="text-indigo-400 font-medium">{inc.assignedTo.name || inc.assignedTo.email}</span>
+                          : <span className="text-slate-500">Non assigné</span>}
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setWarRoom(warRoom?._id === inc._id ? null : inc)}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all flex-shrink-0"
-                  >
-                    {warRoom?._id === inc._id ? 'Close' : 'View War Room'}
-                  </button>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => navigate(`/incidents/${inc._id}`)}
+                      className="flex items-center gap-1.5 border border-[#2A2F45] text-slate-400 hover:text-slate-200 text-sm px-3 py-2 rounded-lg transition-all"
+                      title="Voir la page dédiée"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setWarRoom(warRoom?._id === inc._id ? null : inc)}
+                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all"
+                    >
+                      {warRoom?._id === inc._id ? 'Close' : 'View War Room'}
+                    </button>
+                  </div>
                 </div>
 
                 {warRoom?._id === inc._id && (
                   <div className="mt-4 pt-4 border-t border-[#1E2130]">
                     <WarRoomPanel
                       incident={warRoom}
+                      currentUser={currentUser}
                       onClose={() => setWarRoom(null)}
                       onStatusChange={handleStatusChange}
+                      onAssign={handleAssign}
                       onAddComment={handleAddComment}
                       onPostMortem={handlePostMortem}
                     />

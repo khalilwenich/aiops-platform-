@@ -19,6 +19,11 @@ const settingsSchema = new mongoose.Schema({
       medium: { type: Boolean, default: false },
       qualityGate: { type: Boolean, default: true },
     },
+    cveThresholds: {
+      maxCritical: { type: Number, default: 0 },
+      maxHigh: { type: Number, default: 5 },
+      blockPipeline: { type: Boolean, default: false },
+    },
     channels: {
       email: { enabled: { type: Boolean, default: false }, address: { type: String, default: '' } },
       slack: { enabled: { type: Boolean, default: false }, webhookUrl: { type: String, default: '' } },

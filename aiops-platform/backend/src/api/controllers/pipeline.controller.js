@@ -60,6 +60,19 @@ export async function getPipelineById(req, res, next) {
   }
 }
 
+export async function getProjects(req, res, next) {
+  try {
+    const projects = await Pipeline.aggregate([
+      { $group: { _id: '$projectId', projectName: { $last: '$projectName' } } },
+      { $project: { _id: 0, projectId: '$_id', projectName: 1 } },
+      { $sort: { projectName: 1 } },
+    ]);
+    res.json({ projects });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getPipelineStats(req, res, next) {
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -105,6 +118,90 @@ export async function getPipelineStats(req, res, next) {
       avgMTTR: Math.round(avgMTTR),
       topFailureTypes,
       trendsLast7Days: trendsRaw,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMetrics(req, res, next) {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [byProject, trendsRaw, topErrors, incidentStats] = await Promise.all([
+      Pipeline.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: '$projectId',
+            projectName: { $last: '$projectName' },
+            total: { $sum: 1 },
+            failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            projectId: '$_id',
+            projectName: 1,
+            total: 1,
+            failed: 1,
+            successRate: {
+              $cond: [
+                { $gt: ['$total', 0] },
+                { $multiply: [{ $divide: [{ $subtract: ['$total', '$failed'] }, '$total'] }, 100] },
+                100,
+              ],
+            },
+          },
+        },
+        { $sort: { failed: -1 } },
+      ]),
+      Pipeline.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            total: { $sum: 1 },
+            failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Analysis.aggregate([
+        { $group: { _id: '$errorType', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 8 },
+      ]),
+      import('../../models/Incident.model.js').then(async ({ Incident }) => {
+        const [total, resolved, mttrData] = await Promise.all([
+          Incident.countDocuments(),
+          Incident.countDocuments({ status: 'resolved' }),
+          Incident.find({ status: 'resolved', mttr: { $gt: 0 } }).select('mttr').lean(),
+        ]);
+        const avgMTTR = mttrData.length > 0
+          ? Math.round(mttrData.reduce((s, i) => s + i.mttr, 0) / mttrData.length)
+          : 0;
+        return { total, resolved, avgMTTR };
+      }),
+    ]);
+
+    const overallTotal = byProject.reduce((s, p) => s + p.total, 0);
+    const overallFailed = byProject.reduce((s, p) => s + p.failed, 0);
+
+    res.json({
+      period: '30d',
+      overall: {
+        total: overallTotal,
+        failed: overallFailed,
+        successRate: overallTotal > 0
+          ? +((((overallTotal - overallFailed) / overallTotal) * 100).toFixed(1))
+          : 100,
+      },
+      incidents: incidentStats,
+      byProject,
+      trends: trendsRaw,
+      topErrors,
     });
   } catch (error) {
     next(error);

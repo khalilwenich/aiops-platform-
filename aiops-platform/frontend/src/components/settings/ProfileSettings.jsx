@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { Save, Upload, Eye, EyeOff, Lock } from 'lucide-react';
+import { Save, Upload, Eye, EyeOff, Lock, Bell, BellOff } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '../../api/users.api.js';
+import { pipelinesApi } from '../../api/pipelines.api.js';
 import { updateUser } from '../../store/slices/authSlice.js';
 
 function SectionCard({ title, subtitle, children }) {
@@ -89,13 +91,24 @@ export default function ProfileSettings({ onToast }) {
   const [profile, setProfile] = useState(null);
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [prefs, setPrefs] = useState({ language: 'Français', timezone: 'Africa/Tunis', dateFormat: 'DD/MM/YYYY', theme: 'Dark' });
-  const [loading, setLoading] = useState({ profile: false, password: false, prefs: false });
+  const [subscribedProjects, setSubscribedProjects] = useState([]);
+  const [slackWebhook, setSlackWebhook] = useState('');
+  const [loading, setLoading] = useState({ profile: false, password: false, prefs: false, surveillance: false });
+
+  const { data: projectsData } = useQuery({
+    queryKey: ['pipelines', 'projects'],
+    queryFn: pipelinesApi.getProjects,
+    staleTime: 60_000,
+  });
+  const availableProjects = projectsData?.projects || [];
 
   useEffect(() => {
     usersApi.getProfile()
       .then(({ user }) => {
         setProfile({ name: user.name || '', title: user.title || '', department: user.department || '', phone: user.phone || '', email: user.email });
         if (user.preferences) setPrefs(user.preferences);
+        setSubscribedProjects(user.subscribedProjects || []);
+        setSlackWebhook(user.slackWebhook || '');
       })
       .catch(() => onToast('Failed to load profile', 'error'));
   }, [onToast]);
@@ -147,6 +160,25 @@ export default function ProfileSettings({ onToast }) {
       onToast(err?.error || 'Failed to save preferences', 'error');
     } finally {
       setLoading(l => ({ ...l, prefs: false }));
+    }
+  };
+
+  const toggleProject = (projectId) => {
+    setSubscribedProjects(prev =>
+      prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]
+    );
+  };
+
+  const saveSurveillance = async () => {
+    setLoading(l => ({ ...l, surveillance: true }));
+    try {
+      await usersApi.updateProfile({ subscribedProjects, slackWebhook });
+      dispatch(updateUser({ subscribedProjects, slackWebhook }));
+      onToast('Surveillance settings saved', 'success');
+    } catch (err) {
+      onToast(err?.error || 'Failed to save surveillance settings', 'error');
+    } finally {
+      setLoading(l => ({ ...l, surveillance: false }));
     }
   };
 
@@ -251,6 +283,51 @@ export default function ProfileSettings({ onToast }) {
           ))}
         </div>
         <SaveButton onClick={savePrefs} loading={loading.prefs}>Save Preferences</SaveButton>
+      </SectionCard>
+
+      {/* Surveillance */}
+      <SectionCard title="Surveillance des projets" subtitle="Abonnez-vous aux projets que vous souhaitez surveiller">
+        <div className="mb-5">
+          <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Projets disponibles</p>
+          {availableProjects.length === 0 ? (
+            <p className="text-slate-500 text-sm italic">Aucun projet trouvé dans la base de données.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {availableProjects.map(p => {
+                const subscribed = subscribedProjects.includes(p.projectId);
+                return (
+                  <button
+                    key={p.projectId}
+                    onClick={() => toggleProject(p.projectId)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm text-left transition-all
+                      ${subscribed
+                        ? 'bg-indigo-600/10 border-indigo-500/40 text-indigo-300'
+                        : 'bg-[#1A1D26] border-[#2A2F45] text-slate-400 hover:border-[#3A3F55]'}`}
+                  >
+                    {subscribed
+                      ? <Bell className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      : <BellOff className="w-4 h-4 text-slate-600 flex-shrink-0" />}
+                    <span className="truncate">{p.projectName || p.projectId}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="mb-5">
+          <InputField
+            label="Slack Webhook URL (optionnel)"
+            placeholder="https://hooks.slack.com/services/..."
+            value={slackWebhook}
+            onChange={e => setSlackWebhook(e.target.value)}
+          />
+          <p className="text-xs text-slate-500 mt-1.5">
+            Recevez une notification Slack lors d'une défaillance sur vos projets abonnés.
+          </p>
+        </div>
+
+        <SaveButton onClick={saveSurveillance} loading={loading.surveillance}>Enregistrer</SaveButton>
       </SectionCard>
     </div>
   );

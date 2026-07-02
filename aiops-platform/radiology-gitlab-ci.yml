@@ -4,25 +4,25 @@ stages:
 variables:
   DOCKER_IMAGE: "khalil512/radiology:latest"
 
-# ─── Trivy — scan l'image DockerHub ───────────────────────
+# ─── Trivy — scan l'image DockerHub directement (remote, pas besoin de Docker socket) ───
 trivy:scan:
   stage: security
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
-  before_script:
-    - echo "$DOCKERHUB_TOKEN" | trivy registry login --username khalil512 --password-stdin registry-1.docker.io || true
   script:
     - trivy image
         --format json
         --output trivy-report.json
         --severity CRITICAL,HIGH,MEDIUM,LOW
         --timeout 10m
+        --image-src remote
         $DOCKER_IMAGE
     - echo "=== CVEs critiques et hauts ==="
     - trivy image
         --format table
         --severity CRITICAL,HIGH
+        --image-src remote
         $DOCKER_IMAGE
         || true
   artifacts:

@@ -10,6 +10,9 @@ import { Pipeline } from '../../models/Pipeline.model.js';
 import { Analysis } from '../../models/Analysis.model.js';
 import { Vulnerability } from '../../models/Vulnerability.model.js';
 import { Incident } from '../../models/Incident.model.js';
+import { User } from '../../models/User.model.js';
+import { Settings } from '../../models/Settings.model.js';
+import { OnCall } from '../../models/OnCall.model.js';
 import { mrCommentService } from '../../services/mrComment.service.js';
 import { knowledgeBaseService } from '../../services/knowledgeBase.service.js';
 import { logger } from '../../utils/logger.js';
@@ -130,6 +133,23 @@ async function processPipelineAnalysis(job) {
     { upsert: true, new: true }
   );
 
+  // Step 7a: CVE threshold check — escalate severity if thresholds exceeded
+  const settings = await Settings.getSingleton().catch(() => null);
+  const cveThresholds = settings?.notifications?.cveThresholds;
+  let resolvedRiskLevel = analysisResult.riskLevel || 'medium';
+  if (cveThresholds && vulnerabilities.length > 0) {
+    const criticalCount = vulnerabilities.filter(v => v.severity === 'CRITICAL').length;
+    const highCount = vulnerabilities.filter(v => v.severity === 'HIGH').length;
+    if (criticalCount > cveThresholds.maxCritical) {
+      resolvedRiskLevel = 'critical';
+      logger.warn('CVE critical threshold exceeded — escalating severity', { criticalCount, threshold: cveThresholds.maxCritical, projectId });
+    } else if (highCount > cveThresholds.maxHigh) {
+      resolvedRiskLevel = resolvedRiskLevel === 'critical' ? 'critical' : 'high';
+      logger.warn('CVE high threshold exceeded — escalating severity', { highCount, threshold: cveThresholds.maxHigh, projectId });
+    }
+    analysisResult.riskLevel = resolvedRiskLevel;
+  }
+
   // Step 7b: Auto-create an incident for failed pipelines
   const resolvedStatus = status || pipelineData?.status;
   if (resolvedStatus === 'failed') {
@@ -159,9 +179,54 @@ async function processPipelineAnalysis(job) {
       logger.warn('Failed to create incident', { error: err.message, pipelineId });
     });
     logger.info('Incident ensured for failed pipeline', { pipelineId });
+
+    // Auto-assign critical incidents to the current on-call person
+    if (resolvedRiskLevel === 'critical') {
+      const onCallEntry = await OnCall.getCurrentOnCall().catch(() => null);
+      if (onCallEntry?.userId?._id) {
+        await Incident.findOneAndUpdate(
+          { pipelineId: String(pipelineId), assignedTo: { $exists: false } },
+          {
+            assignedTo: onCallEntry.userId._id,
+            assignedAt: new Date(),
+            $push: {
+              timeline: {
+                timestamp: new Date(),
+                actor: 'AIOps Bot',
+                action: 'assigned',
+                message: `Auto-assigné à l'on-call : ${onCallEntry.userId.name || onCallEntry.userId.email}`,
+              },
+            },
+          }
+        ).catch(err => logger.warn('On-call auto-assign failed', { error: err.message }));
+        logger.info('Critical incident auto-assigned to on-call', { onCall: onCallEntry.userId.email, pipelineId });
+      }
+    }
   }
 
-  // Step 7c: Post AI analysis as a comment on the related merge request, if any
+  // Step 7c: Slack notifications for subscribed users
+  if (resolvedStatus === 'failed') {
+    const pName = pipelineData?.project?.name || projectName || String(projectId);
+    const slackUsers = await User.find({
+      subscribedProjects: String(projectId),
+      slackWebhook: { $nin: ['', null] },
+      isActive: true,
+    }).select('slackWebhook').lean().catch(() => []);
+
+    for (const u of slackUsers) {
+      const payload = {
+        text: `🚨 *Pipeline failure* — ${pName} #${pipelineId}\n*Cause:* ${analysisResult.rootCause || analysisResult.summary || 'Unknown'}\n*Sévérité:* ${analysisResult.riskLevel || 'medium'}`,
+      };
+      fetch(u.slackWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(err => logger.warn('Slack notification failed', { error: err.message }));
+    }
+    if (slackUsers.length > 0) logger.info('Slack notifications sent', { count: slackUsers.length, projectId });
+  }
+
+  // Step 7d: Post AI analysis as a comment on the related merge request, if any
   if (resolvedStatus === 'failed') {
     mrCommentService.findMRForBranch(projectId, ref).then(async (mr) => {
       if (mr) {

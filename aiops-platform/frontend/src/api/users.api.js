@@ -2,6 +2,7 @@ import { apiClient } from './client.js';
 
 export const usersApi = {
   getAll:         ()              => apiClient.get('/api/users'),
+  list:           ()              => apiClient.get('/api/users'),
   create:         (data)          => apiClient.post('/api/users', data),
   update:         (id, data)      => apiClient.patch(`/api/users/${id}`, data),
   resetPassword:  (id)            => apiClient.post(`/api/users/${id}/reset-password`),

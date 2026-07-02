@@ -15,7 +15,7 @@ function SectionCard({ title, subtitle, children }) {
   );
 }
 
-const ROLES = ['admin', 'analyst', 'viewer'];
+const ROLES = ['admin', 'analyst', 'security', 'viewer'];
 
 function TempPasswordModal({ email, tempPassword, onClose }) {
   const [copied, setCopied] = useState(false);

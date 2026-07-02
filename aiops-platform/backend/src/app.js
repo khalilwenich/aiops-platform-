@@ -14,6 +14,7 @@ import incidentRoutes       from './api/routes/incident.routes.js';
 import weeklyReportRoutes   from './api/routes/weeklyReport.routes.js';
 import usersRoutes          from './api/routes/users.routes.js';
 import settingsRoutes       from './api/routes/settings.routes.js';
+import onCallRoutes         from './api/routes/oncall.routes.js';
 import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
@@ -70,6 +71,7 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        subscribedProjects: user.subscribedProjects || [],
         mustChangePassword: user.mustChangePassword,
       },
     });
@@ -106,6 +108,7 @@ app.use('/api/incidents',      incidentRoutes);
 app.use('/api/reports',        weeklyReportRoutes);
 app.use('/api/users',          usersRoutes);
 app.use('/api/settings',       settingsRoutes);
+app.use('/api/oncall',         onCallRoutes);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 

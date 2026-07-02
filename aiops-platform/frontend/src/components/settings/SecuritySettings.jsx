@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Monitor, Smartphone, Copy, Trash2, Plus, X, Save } from 'lucide-react';
+import { Monitor, Smartphone, Copy, Trash2, Plus, X, Save, ShieldAlert } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { settingsApi } from '../../api/settings.api.js';
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -138,6 +140,24 @@ export default function SecuritySettings({ onToast }) {
   const [security, setSecurity]         = useState({ timeout: true, loginNotif: true, webhookSig: true });
   const [timeoutDur, setTimeoutDur]     = useState('30 min');
   const [webhookTooltip, setWebhookTooltip] = useState(false);
+  const [cveThresholds, setCveThresholds] = useState({ maxCritical: 0, maxHigh: 5, blockPipeline: false });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsApi.getAll,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const t = settingsData?.settings?.notifications?.cveThresholds;
+    if (t) setCveThresholds({ maxCritical: t.maxCritical ?? 0, maxHigh: t.maxHigh ?? 5, blockPipeline: t.blockPipeline ?? false });
+  }, [settingsData]);
+
+  const saveCveMutation = useMutation({
+    mutationFn: () => settingsApi.updateSection('notifications', { cveThresholds }),
+    onSuccess: () => onToast('CVE thresholds saved', 'success'),
+    onError: () => onToast('Failed to save thresholds', 'error'),
+  });
 
   const revoke = id => setSessions(s => s.filter(x => x.id !== id));
   const deleteToken = id => setTokens(t => t.filter(x => x.id !== id));
@@ -303,6 +323,60 @@ export default function SecuritySettings({ onToast }) {
             <Save className="w-4 h-4" /> Save Security Settings
           </button>
         </div>
+      </SectionCard>
+
+      {/* CVE Thresholds */}
+      <SectionCard
+        title="Seuils CVE configurables"
+        subtitle="Définissez les seuils au-delà desquels un incident est automatiquement escaladé en 'critical'"
+      >
+        <div className="flex items-start gap-2 mb-5 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+          <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300/80">
+            Lorsque le nombre de CVE dépasse ces seuils, la sévérité de l'incident est automatiquement escaladée.
+            Seuil 0 = toute CVE critique déclenche l'escalade.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-6 mb-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">
+              Seuil CVE CRITICAL (max autorisé)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cveThresholds.maxCritical}
+              onChange={e => setCveThresholds(p => ({ ...p, maxCritical: +e.target.value }))}
+              className="w-full bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2.5
+                text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+            />
+            <p className="text-slate-600 text-xs mt-1">Au-delà de ce nombre → sévérité "critical"</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">
+              Seuil CVE HIGH (max autorisé)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cveThresholds.maxHigh}
+              onChange={e => setCveThresholds(p => ({ ...p, maxHigh: +e.target.value }))}
+              className="w-full bg-[#1A1D26] border border-[#2A2F45] rounded-lg px-4 py-2.5
+                text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+            />
+            <p className="text-slate-600 text-xs mt-1">Au-delà de ce nombre → sévérité "high"</p>
+          </div>
+        </div>
+        <button
+          onClick={() => saveCveMutation.mutate()}
+          disabled={saveCveMutation.isPending}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-all"
+        >
+          {saveCveMutation.isPending
+            ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            : <Save className="w-4 h-4" />}
+          Enregistrer les seuils
+        </button>
       </SectionCard>
     </div>
   );

@@ -11,7 +11,13 @@ export async function getAll(req, res, next) {
 
     const skip = (Number(page) - 1) * Number(limit);
     const [incidents, total] = await Promise.all([
-      Incident.find(filter).sort({ detectedAt: -1 }).skip(skip).limit(Number(limit)).populate('analysis').lean(),
+      Incident.find(filter)
+        .sort({ detectedAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .populate('analysis')
+        .populate('assignedTo', 'name email')
+        .lean(),
       Incident.countDocuments(filter),
     ]);
 
@@ -23,7 +29,10 @@ export async function getAll(req, res, next) {
 
 export async function getById(req, res, next) {
   try {
-    const incident = await Incident.findById(req.params.id).populate('analysis').lean();
+    const incident = await Incident.findById(req.params.id)
+      .populate('analysis')
+      .populate('assignedTo', 'name email')
+      .lean();
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
     res.json(incident);
   } catch (error) {
@@ -34,24 +43,76 @@ export async function getById(req, res, next) {
 export async function updateStatus(req, res, next) {
   try {
     const { status, message } = req.body;
+    const allowed = ['open', 'acknowledged', 'investigating', 'resolved'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Allowed: ${allowed.join(', ')}` });
+    }
+
     const incident = await Incident.findById(req.params.id);
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
 
     incident.status = status;
-    if (status === 'resolved') {
+    if (status === 'acknowledged') {
+      incident.acknowledgedAt = new Date();
+    } else if (status === 'resolved') {
       incident.resolvedAt = new Date();
       incident.mttr = Math.round((incident.resolvedAt - incident.detectedAt) / (1000 * 60));
     }
 
+    const actionLabel = {
+      acknowledged:  'acknowledged',
+      investigating: 'investigating',
+      resolved:      'resolved',
+      open:          'reopened',
+    }[status] || 'status_update';
+
     incident.timeline.push({
       timestamp: new Date(),
       actor:     req.user?.email || 'unknown',
-      action:    status === 'resolved' ? 'resolved' : 'status_update',
+      action:    actionLabel,
       message:   message || `Status changed to ${status}`,
     });
 
     await incident.save();
+    await incident.populate('assignedTo', 'name email');
     logger.info('Incident status updated', { id: incident._id, status });
+    res.json(incident.toObject());
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function assign(req, res, next) {
+  try {
+    const incident = await Incident.findById(req.params.id);
+    if (!incident) return res.status(404).json({ error: 'Incident not found' });
+
+    const targetUserId = req.body.userId || req.user.id;
+    const alreadyAssigned = incident.assignedTo?.toString() === targetUserId;
+
+    if (alreadyAssigned) {
+      incident.assignedTo = undefined;
+      incident.assignedAt = undefined;
+      incident.timeline.push({
+        timestamp: new Date(),
+        actor:     req.user.email,
+        action:    'unassigned',
+        message:   `${req.user.email} unassigned the incident`,
+      });
+    } else {
+      incident.assignedTo = targetUserId;
+      incident.assignedAt = new Date();
+      incident.timeline.push({
+        timestamp: new Date(),
+        actor:     req.user.email,
+        action:    'assigned',
+        message:   `Assigned to ${req.user.email}`,
+      });
+    }
+
+    await incident.save();
+    await incident.populate('assignedTo', 'name email');
+    logger.info('Incident assignment updated', { id: incident._id, assignedTo: incident.assignedTo });
     res.json(incident.toObject());
   } catch (error) {
     next(error);
