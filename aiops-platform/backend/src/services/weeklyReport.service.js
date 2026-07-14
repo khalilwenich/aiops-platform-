@@ -5,18 +5,22 @@ import { healthScoreService } from './healthScore.service.js';
 import { logger } from '../utils/logger.js';
 
 class WeeklyReportService {
-  async generateReport(weekOffset = 0) {
+  async generateReport(weekOffset = 0, projectIds = null) {
     const { start, end } = this.getWeekRange(weekOffset);
+    const projectFilter = projectIds ? { projectId: { $in: projectIds } } : {};
 
     const [pipelines, analyses, vulnerabilities] = await Promise.all([
-      Pipeline.find({ createdAt: { $gte: start, $lte: end } }).lean(),
-      Analysis.find({ createdAt: { $gte: start, $lte: end } }).lean(),
-      Vulnerability.find({ createdAt: { $gte: start, $lte: end } }).lean(),
+      Pipeline.find({ ...projectFilter, createdAt: { $gte: start, $lte: end } }).lean(),
+      Analysis.find({ ...projectFilter, createdAt: { $gte: start, $lte: end } }).lean(),
+      Vulnerability.find({ ...projectFilter, createdAt: { $gte: start, $lte: end } }).lean(),
     ]);
 
     let healthScores = [];
     try {
-      healthScores = await healthScoreService.getAllScores();
+      const allScores = await healthScoreService.getAllScores();
+      healthScores = projectIds
+        ? allScores.filter(s => projectIds.includes(s.projectId))
+        : allScores;
     } catch (err) {
       logger.warn('Could not fetch health scores for report', { error: err.message });
     }

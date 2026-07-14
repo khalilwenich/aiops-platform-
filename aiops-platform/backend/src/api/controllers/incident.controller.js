@@ -1,10 +1,11 @@
 import { Incident } from '../../models/Incident.model.js';
 import { logger }   from '../../utils/logger.js';
+import { projectFilter } from '../middlewares/teamAccess.middleware.js';
 
 export async function getAll(req, res, next) {
   try {
     const { status, severity, projectId, page = 1, limit = 20 } = req.query;
-    const filter = {};
+    const filter = { ...projectFilter(req) };
     if (status)    filter.status    = status;
     if (severity)  filter.severity  = severity;
     if (projectId) filter.projectId = projectId;

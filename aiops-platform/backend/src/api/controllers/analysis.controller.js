@@ -2,6 +2,7 @@ import { Analysis } from '../../models/Analysis.model.js';
 import { Pipeline } from '../../models/Pipeline.model.js';
 import { knowledgeBaseService } from '../../services/knowledgeBase.service.js';
 import { logger } from '../../utils/logger.js';
+import { projectFilter } from '../middlewares/teamAccess.middleware.js';
 
 export async function getAnalysisByPipeline(req, res, next) {
   try {
@@ -20,7 +21,7 @@ export async function getAnalysisByPipeline(req, res, next) {
 export async function getRecentAnalyses(req, res, next) {
   try {
     const { page = 1, limit = 20, status, riskLevel } = req.query;
-    const filter = {};
+    const filter = { ...projectFilter(req) };
     if (status === 'resolved') filter.resolved = true;
     if (status === 'open') filter.resolved = { $ne: true };
     if (riskLevel) filter.riskLevel = riskLevel;
@@ -122,7 +123,10 @@ export async function getUsageStats(req, res, next) {
 
 export async function getTopRecurringIssues(req, res, next) {
   try {
+    const filter = projectFilter(req);
+    const matchBase = Object.keys(filter).length ? [{ $match: filter }] : [];
     const topIssues = await Analysis.aggregate([
+      ...matchBase,
       {
         $group: {
           _id: '$errorType',

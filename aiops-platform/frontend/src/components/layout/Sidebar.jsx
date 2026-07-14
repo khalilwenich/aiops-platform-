@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap, BookOpen, Heart, FileText, AlertTriangle, BarChart2, PhoneCall } from 'lucide-react';
+import { LayoutDashboard, GitBranch, Brain, ShieldAlert, Settings, LogOut, Zap, BookOpen, Heart, FileText, AlertTriangle, BarChart2, PhoneCall, Users } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/slices/authSlice.js';
 import { incidentApi } from '../../api/incident.api.js';
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { path: '/incidents',  icon: AlertTriangle,    label: 'Incidents' },
   { path: '/metrics',    icon: BarChart2,        label: 'Métriques' },
   { path: '/oncall',     icon: PhoneCall,        label: 'On-Call' },
+  { path: '/teams',      icon: Users,            label: 'Équipes',   adminOnly: true },
   { path: '/settings',   icon: Settings,         label: 'Settings' },
 ];
 
@@ -50,7 +51,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+        {NAV_ITEMS.filter(item => !item.adminOnly || user?.role === 'admin').map(({ path, icon: Icon, label }) => {
           const badge = path === '/incidents' ? openCount : 0;
           return (
           <NavLink

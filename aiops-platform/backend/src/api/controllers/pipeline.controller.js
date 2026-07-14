@@ -2,6 +2,7 @@ import { Pipeline } from '../../models/Pipeline.model.js';
 import { Analysis } from '../../models/Analysis.model.js';
 import { pipelineQueue } from '../../queues/queues.js';
 import { logger } from '../../utils/logger.js';
+import { projectFilter } from '../middlewares/teamAccess.middleware.js';
 
 export async function getAllPipelines(req, res, next) {
   try {
@@ -14,9 +15,13 @@ export async function getAllPipelines(req, res, next) {
       endDate,
     } = req.query;
 
-    const filter = {};
+    const filter = { ...projectFilter(req) };
     if (status) filter.status = status;
     if (projectId) filter.projectId = projectId;
+    if (req.query.search) {
+      const re = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ projectId: re }, { projectName: re }, { pipelineId: re }];
+    }
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
@@ -62,11 +67,15 @@ export async function getPipelineById(req, res, next) {
 
 export async function getProjects(req, res, next) {
   try {
-    const projects = await Pipeline.aggregate([
+    const matchStage = projectFilter(req);
+    const pipeline = [];
+    if (Object.keys(matchStage).length) pipeline.push({ $match: matchStage });
+    pipeline.push(
       { $group: { _id: '$projectId', projectName: { $last: '$projectName' } } },
       { $project: { _id: 0, projectId: '$_id', projectName: 1 } },
       { $sort: { projectName: 1 } },
-    ]);
+    );
+    const projects = await Pipeline.aggregate(pipeline);
     res.json({ projects });
   } catch (error) {
     next(error);
@@ -76,13 +85,15 @@ export async function getProjects(req, res, next) {
 export async function getPipelineStats(req, res, next) {
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const filter = projectFilter(req);
+    const matchBase = Object.keys(filter).length ? [{ $match: filter }] : [];
 
     const [totalPipelines, failedPipelines, analyses, trendsRaw] = await Promise.all([
-      Pipeline.countDocuments(),
-      Pipeline.countDocuments({ status: 'failed' }),
-      Analysis.find({ resolved: true, mttr: { $gt: 0 } }).select('mttr').lean(),
+      Pipeline.countDocuments(filter),
+      Pipeline.countDocuments({ ...filter, status: 'failed' }),
+      Analysis.find({ ...filter, resolved: true, mttr: { $gt: 0 } }).select('mttr').lean(),
       Pipeline.aggregate([
-        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+        { $match: { ...filter, createdAt: { $gte: sevenDaysAgo } } },
         {
           $group: {
             _id: {
@@ -104,6 +115,7 @@ export async function getPipelineStats(req, res, next) {
         : 0;
 
     const topFailureTypes = await Analysis.aggregate([
+      ...matchBase,
       { $group: { _id: '$errorType', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 },
@@ -127,10 +139,12 @@ export async function getPipelineStats(req, res, next) {
 export async function getMetrics(req, res, next) {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const filter = projectFilter(req);
+    const matchBase = Object.keys(filter).length ? [{ $match: filter }] : [];
 
     const [byProject, trendsRaw, topErrors, incidentStats] = await Promise.all([
       Pipeline.aggregate([
-        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $match: { ...filter, createdAt: { $gte: thirtyDaysAgo } } },
         {
           $group: {
             _id: '$projectId',
@@ -158,7 +172,7 @@ export async function getMetrics(req, res, next) {
         { $sort: { failed: -1 } },
       ]),
       Pipeline.aggregate([
-        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $match: { ...filter, createdAt: { $gte: thirtyDaysAgo } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -169,15 +183,16 @@ export async function getMetrics(req, res, next) {
         { $sort: { _id: 1 } },
       ]),
       Analysis.aggregate([
+        ...matchBase,
         { $group: { _id: '$errorType', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 8 },
       ]),
       import('../../models/Incident.model.js').then(async ({ Incident }) => {
         const [total, resolved, mttrData] = await Promise.all([
-          Incident.countDocuments(),
-          Incident.countDocuments({ status: 'resolved' }),
-          Incident.find({ status: 'resolved', mttr: { $gt: 0 } }).select('mttr').lean(),
+          Incident.countDocuments(filter),
+          Incident.countDocuments({ ...filter, status: 'resolved' }),
+          Incident.find({ ...filter, status: 'resolved', mttr: { $gt: 0 } }).select('mttr').lean(),
         ]);
         const avgMTTR = mttrData.length > 0
           ? Math.round(mttrData.reduce((s, i) => s + i.mttr, 0) / mttrData.length)

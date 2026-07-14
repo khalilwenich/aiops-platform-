@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import { resolveTeamAccess } from '../middlewares/teamAccess.middleware.js';
 import {
   getAllPipelines,
   getPipelineById,
@@ -11,10 +12,10 @@ import {
 
 const router = Router();
 
-router.get('/', authenticate, getAllPipelines);
-router.get('/stats', authenticate, getPipelineStats);
-router.get('/projects', authenticate, getProjects);
-router.get('/metrics', authenticate, getMetrics);
+router.get('/', authenticate, resolveTeamAccess, getAllPipelines);
+router.get('/stats', authenticate, resolveTeamAccess, getPipelineStats);
+router.get('/projects', authenticate, resolveTeamAccess, getProjects);
+router.get('/metrics', authenticate, resolveTeamAccess, getMetrics);
 router.get('/:id', authenticate, getPipelineById);
 router.post('/:id/retry', authenticate, authorize('admin', 'analyst'), retriggerAnalysis);
 

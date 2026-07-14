@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { GitBranch, Filter, RefreshCw, Bell } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePipelines } from '../hooks/usePipelines.js';
@@ -14,10 +15,17 @@ const STATUS_FILTERS = ['all', 'failed', 'success', 'running', 'canceled'];
 export function PipelinesPage() {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentPage, statusFilter } = useSelector(s => s.pipelines);
   const currentUser = useSelector(s => s.auth.user);
-  const [projectSearch, setProjectSearch] = useState('');
+  const [projectSearch, setProjectSearch] = useState(searchParams.get('search') || '');
   const [myProjectsOnly, setMyProjectsOnly] = useState(false);
+
+  // Sync URL search param into local state on mount
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s) setProjectSearch(s);
+  }, []);
 
   const subscribedProjects = currentUser?.subscribedProjects || [];
 
@@ -25,7 +33,7 @@ export function PipelinesPage() {
     page: currentPage,
     limit: 25,
     ...(statusFilter && statusFilter !== 'all' && { status: statusFilter }),
-    ...(projectSearch && { projectId: projectSearch }),
+    ...(projectSearch && { search: projectSearch }),
   };
 
   const { data, isLoading, isFetching } = usePipelines(params);

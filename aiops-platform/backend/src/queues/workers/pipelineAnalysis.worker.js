@@ -15,6 +15,7 @@ import { Settings } from '../../models/Settings.model.js';
 import { OnCall } from '../../models/OnCall.model.js';
 import { mrCommentService } from '../../services/mrComment.service.js';
 import { knowledgeBaseService } from '../../services/knowledgeBase.service.js';
+import { notificationQueue } from '../queues.js';
 import { logger } from '../../utils/logger.js';
 import { getIO } from '../../socket.js';
 
@@ -204,7 +205,29 @@ async function processPipelineAnalysis(job) {
     }
   }
 
-  // Step 7c: Slack notifications for subscribed users
+  // Step 7c: Queue global Slack notification + per-user Slack
+  if (resolvedStatus === 'failed') {
+    const pName = pipelineData?.project?.name || projectName || String(projectId);
+    notificationQueue.add('pipeline-failed', {
+      type: 'pipeline-failed',
+      payload: {
+        projectId: String(projectId),
+        projectName: pName,
+        pipelineId: String(pipelineId),
+        rootCause: analysisResult.rootCause,
+        summary: analysisResult.summary,
+        riskLevel: resolvedRiskLevel,
+      },
+    }).catch(err => logger.warn('Failed to queue global notification', { error: err.message }));
+
+    if (resolvedRiskLevel === 'critical') {
+      notificationQueue.add('incident-critical', {
+        type: 'incident-critical',
+        payload: { projectId: String(projectId), projectName: pName, pipelineId: String(pipelineId), riskLevel: resolvedRiskLevel },
+      }).catch(() => {});
+    }
+  }
+
   if (resolvedStatus === 'failed') {
     const pName = pipelineData?.project?.name || projectName || String(projectId);
     const slackUsers = await User.find({

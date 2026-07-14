@@ -15,10 +15,17 @@ import Incidents from './pages/Incidents.jsx';
 import IncidentDetail from './pages/IncidentDetail.jsx';
 import MetricsPage from './pages/MetricsPage.jsx';
 import OnCallPage from './pages/OnCallPage.jsx';
+import TeamsPage from './pages/TeamsPage.jsx';
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useSelector(s => s.auth.isAuthenticated);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const user = useSelector(s => s.auth.user);
+  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -48,6 +55,7 @@ export function App() {
           <Route path="/incidents/:id" element={<IncidentDetail />} />
           <Route path="/metrics"    element={<MetricsPage />} />
           <Route path="/oncall"     element={<OnCallPage />} />
+          <Route path="/teams"      element={<AdminRoute><TeamsPage /></AdminRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

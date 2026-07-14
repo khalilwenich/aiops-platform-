@@ -15,6 +15,7 @@ import weeklyReportRoutes   from './api/routes/weeklyReport.routes.js';
 import usersRoutes          from './api/routes/users.routes.js';
 import settingsRoutes       from './api/routes/settings.routes.js';
 import onCallRoutes         from './api/routes/oncall.routes.js';
+import teamRoutes           from './api/routes/team.routes.js';
 import { errorHandler } from './api/middlewares/errorHandler.middleware.js';
 import { User } from './models/User.model.js';
 import { generateTokens, authenticate } from './api/middlewares/auth.middleware.js';
@@ -109,6 +110,7 @@ app.use('/api/reports',        weeklyReportRoutes);
 app.use('/api/users',          usersRoutes);
 app.use('/api/settings',       settingsRoutes);
 app.use('/api/oncall',         onCallRoutes);
+app.use('/api/teams',          teamRoutes);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 
